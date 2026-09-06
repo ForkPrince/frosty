@@ -404,7 +404,18 @@ abstract class NativeVideoStoreBase
     runInAction(
       () => _restrictedStreamQualities = token.restrictedQualities,
     );
-    final hlsUrl = twitchGqlApi.buildHlsUrl(login: userLogin, token: token);
+
+    // Resolve the stream proxy: use the custom URL if a custom proxy is
+    // selected, otherwise use the preset value directly.
+    final proxy = settingsStore.streamProxy == 'custom'
+        ? settingsStore.customStreamProxy
+        : settingsStore.streamProxy;
+
+    final hlsUrl = twitchGqlApi.buildHlsUrl(
+      login: userLogin,
+      token: token,
+      proxy: proxy,
+    );
 
     await _controller!.loadUrl(
       url: hlsUrl,

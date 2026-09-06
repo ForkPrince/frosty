@@ -24,6 +24,8 @@ SettingsStore _$SettingsStoreFromJson(
   ..defaultToHighestQuality = json['defaultToHighestQuality'] as bool? ?? false
   ..useTextureRendering = json['useTextureRendering'] as bool? ?? true
   ..useNativePlayer = json['useNativePlayer'] as bool? ?? true
+  ..streamProxy = json['streamProxy'] as String? ?? ''
+  ..customStreamProxy = json['customStreamProxy'] as String? ?? ''
   ..nativePlayerV52Migrated = json['nativePlayerV52Migrated'] as bool? ?? false
   ..showOverlay = json['showOverlay'] as bool? ?? true
   ..toggleableOverlay = json['toggleableOverlay'] as bool? ?? false
@@ -107,6 +109,8 @@ Map<String, dynamic> _$SettingsStoreToJson(
   'defaultToHighestQuality': instance.defaultToHighestQuality,
   'useTextureRendering': instance.useTextureRendering,
   'useNativePlayer': instance.useNativePlayer,
+  'streamProxy': instance.streamProxy,
+  'customStreamProxy': instance.customStreamProxy,
   'nativePlayerV52Migrated': instance.nativePlayerV52Migrated,
   'showOverlay': instance.showOverlay,
   'toggleableOverlay': instance.toggleableOverlay,
@@ -349,6 +353,42 @@ mixin _$SettingsStore on _SettingsStoreBase, Store {
   set useNativePlayer(bool value) {
     _$useNativePlayerAtom.reportWrite(value, super.useNativePlayer, () {
       super.useNativePlayer = value;
+    });
+  }
+
+  late final _$streamProxyAtom = Atom(
+    name: '_SettingsStoreBase.streamProxy',
+    context: context,
+  );
+
+  @override
+  String get streamProxy {
+    _$streamProxyAtom.reportRead();
+    return super.streamProxy;
+  }
+
+  @override
+  set streamProxy(String value) {
+    _$streamProxyAtom.reportWrite(value, super.streamProxy, () {
+      super.streamProxy = value;
+    });
+  }
+
+  late final _$customStreamProxyAtom = Atom(
+    name: '_SettingsStoreBase.customStreamProxy',
+    context: context,
+  );
+
+  @override
+  String get customStreamProxy {
+    _$customStreamProxyAtom.reportRead();
+    return super.customStreamProxy;
+  }
+
+  @override
+  set customStreamProxy(String value) {
+    _$customStreamProxyAtom.reportWrite(value, super.customStreamProxy, () {
+      super.customStreamProxy = value;
     });
   }
 
@@ -1245,6 +1285,8 @@ showVideo: ${showVideo},
 defaultToHighestQuality: ${defaultToHighestQuality},
 useTextureRendering: ${useTextureRendering},
 useNativePlayer: ${useNativePlayer},
+streamProxy: ${streamProxy},
+customStreamProxy: ${customStreamProxy},
 showOverlay: ${showOverlay},
 toggleableOverlay: ${toggleableOverlay},
 showLatency: ${showLatency},

@@ -69,6 +69,8 @@ abstract class _SettingsStoreBase with Store {
   static const defaultDefaultToHighestQuality = false;
   static const defaultUseTextureRendering = true;
   static const defaultUseNativePlayer = true;
+  static const defaultStreamProxy = '';
+  static const defaultCustomStreamProxy = '';
 
   static const defaultShowOverlay = true;
   static const defaultToggleableOverlay = false;
@@ -90,6 +92,14 @@ abstract class _SettingsStoreBase with Store {
   @JsonKey(defaultValue: defaultUseNativePlayer)
   @observable
   var useNativePlayer = defaultUseNativePlayer;
+
+  @JsonKey(defaultValue: defaultStreamProxy)
+  @observable
+  var streamProxy = defaultStreamProxy;
+
+  @JsonKey(defaultValue: defaultCustomStreamProxy)
+  @observable
+  var customStreamProxy = defaultCustomStreamProxy;
 
   /// 5.2.0 made native the default. 5.1.0 already wrote
   /// `useNativePlayer: false` into saved settings, so a Dart default
@@ -123,6 +133,8 @@ abstract class _SettingsStoreBase with Store {
     defaultToHighestQuality = defaultDefaultToHighestQuality;
     useTextureRendering = defaultUseTextureRendering;
     useNativePlayer = defaultUseNativePlayer;
+    streamProxy = defaultStreamProxy;
+    customStreamProxy = defaultCustomStreamProxy;
 
     showOverlay = defaultShowOverlay;
     toggleableOverlay = defaultToggleableOverlay;

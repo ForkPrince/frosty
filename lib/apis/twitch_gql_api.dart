@@ -93,9 +93,14 @@ class TwitchGqlApi extends BaseApiClient {
   }
 
   /// Builds the HLS stream URL for the given channel [login] and [token].
+  ///
+  /// When [proxy] is non-empty, the URL is rewritten to route through the
+  /// ad-blocking proxy server instead of fetching directly from Twitch's
+  /// Usher API. The proxy strips ad segments from the M3U8 playlist.
   String buildHlsUrl({
     required String login,
     required PlaybackAccessToken token,
+    String? proxy,
   }) {
     final random = Random().nextInt(999999);
     final encodedToken = Uri.encodeComponent(token.value);
@@ -103,7 +108,7 @@ class TwitchGqlApi extends BaseApiClient {
     // Usher v2 — what the web player and streamlink use today. Same query
     // params and token; the multivariant playlist is standards-compliant
     // (EXT-X-SESSION-DATA + STREAM-INF only, no EXT-X-MEDIA/TWITCH-INFO).
-    return 'https://usher.ttvnw.net/api/v2/channel/hls/$login.m3u8'
+    final usherUrl = 'https://usher.ttvnw.net/api/v2/channel/hls/$login.m3u8'
         '?sig=${token.signature}'
         '&token=$encodedToken'
         '&allow_source=true'
@@ -116,6 +121,15 @@ class TwitchGqlApi extends BaseApiClient {
         '&play_session_id=${_randomSessionId()}'
         '&playlist_include_framerate=true'
         '&p=$random';
+
+    if (proxy != null && proxy.isNotEmpty) {
+      // Route through the ad-blocking proxy. The proxy fetches the M3U8
+      // from Usher, strips ad segments, and returns the cleaned playlist.
+      final parameters = '$login.m3u8?allow_source=true&allow_audio_only=true&fast_bread=true';
+      return '$proxy/playlist/${Uri.encodeComponent(parameters)}';
+    }
+
+    return usherUrl;
   }
 
   /// 32-char hex play-session id, matching the web client and streamlink. Sent
