@@ -9,6 +9,8 @@ jobs:
     name: Draft release and attach APK
     runs-on: ubuntu-latest
     environment: release-android
+    permissions:
+      contents: write
     env:
       UPLOAD_KEYSTORE: ${{ secrets.UPLOAD_KEYSTORE }}
       STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
