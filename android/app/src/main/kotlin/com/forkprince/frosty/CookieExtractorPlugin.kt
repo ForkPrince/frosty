@@ -1,4 +1,4 @@
-package com.tommychow.frosty
+package com.forkprince.frosty
 
 import android.webkit.CookieManager
 import io.flutter.embedding.engine.plugins.FlutterPlugin

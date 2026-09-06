@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:403282332389:android:a7ff237168bad4c30be20c",
         "android_client_info": {
-          "package_name": "com.tommychow.frosty"
+          "package_name": "com.forkprince.frosty"
         }
       },
       "oauth_client": [
@@ -34,7 +34,7 @@
               "client_id": "403282332389-gst8k8gl71a7vrhf5k69nl8pnsq19rg8.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.tommychow.frosty"
+                "bundle_id": "com.forkprince.frosty"
               }
             }
           ]

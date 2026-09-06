@@ -44,7 +44,7 @@
       width="200px"
     />
   </a>
-  <a href="https://play.google.com/store/apps/details?id=com.tommychow.frosty">
+  <a href="https://play.google.com/store/apps/details?id=com.forkprince.frosty">
     <img
       title="Get it on Android (Google Play Store)"
       alt="Google Play Store badge."

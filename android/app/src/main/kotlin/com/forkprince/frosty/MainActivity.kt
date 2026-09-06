@@ -1,4 +1,4 @@
-package com.tommychow.frosty
+package com.forkprince.frosty
 
 import cl.puntito.simple_pip_mode.PipCallbackHelperActivityWrapper
 import io.flutter.embedding.engine.FlutterEngine

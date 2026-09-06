@@ -65,6 +65,6 @@ class DefaultFirebaseOptions {
     storageBucket: 'frosty-128de.appspot.com',
     iosClientId:
         '403282332389-gst8k8gl71a7vrhf5k69nl8pnsq19rg8.apps.googleusercontent.com',
-    iosBundleId: 'com.tommychow.frosty',
+    iosBundleId: 'com.forkprince.frosty',
   );
 }
