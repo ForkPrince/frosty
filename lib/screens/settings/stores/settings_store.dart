@@ -71,6 +71,7 @@ abstract class _SettingsStoreBase with Store {
   static const defaultUseNativePlayer = true;
   static const defaultStreamProxy = '';
   static const defaultCustomStreamProxy = '';
+  static const defaultWebViewAdBlockScript = 'vaft';
 
   static const defaultShowOverlay = true;
   static const defaultToggleableOverlay = false;
@@ -100,6 +101,13 @@ abstract class _SettingsStoreBase with Store {
   @JsonKey(defaultValue: defaultCustomStreamProxy)
   @observable
   var customStreamProxy = defaultCustomStreamProxy;
+
+  /// Ad-blocking script injected into the WebView player at page load,
+  /// ported from Samtch (TwitchAdSolutions' `vaft` / `video-swap`).
+  /// Empty string disables injection. Does not apply to the native player.
+  @JsonKey(defaultValue: defaultWebViewAdBlockScript)
+  @observable
+  var webViewAdBlockScript = defaultWebViewAdBlockScript;
 
   /// 5.2.0 made native the default. 5.1.0 already wrote
   /// `useNativePlayer: false` into saved settings, so a Dart default
@@ -135,6 +143,7 @@ abstract class _SettingsStoreBase with Store {
     useNativePlayer = defaultUseNativePlayer;
     streamProxy = defaultStreamProxy;
     customStreamProxy = defaultCustomStreamProxy;
+    webViewAdBlockScript = defaultWebViewAdBlockScript;
 
     showOverlay = defaultShowOverlay;
     toggleableOverlay = defaultToggleableOverlay;

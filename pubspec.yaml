@@ -150,6 +150,7 @@ flutter:
     assets:
         - assets/icons/logo.svg
         - assets/fonts/
+        - assets/js/adblock/
         - assets/release-notes.md
 
     # An image asset can refer to one or more resolution-specific "variants", see

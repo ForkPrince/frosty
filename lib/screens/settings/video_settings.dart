@@ -26,6 +26,14 @@ const _streamProxies = <String, String>{
   'Custom': 'custom',
 };
 
+/// Ad-blocking scripts for the WebView player (ported from Samtch, which
+/// bundles pixeltris' TwitchAdSolutions).
+const _webViewAdBlockScripts = <String, String>{
+  'Disabled': '',
+  'vaft': 'vaft',
+  'video-swap': 'videoSwap',
+};
+
 class VideoSettings extends StatelessWidget {
   final SettingsStore settingsStore;
 
@@ -69,43 +77,69 @@ class VideoSettings extends StatelessWidget {
               onChanged: (newValue) =>
                   settingsStore.useTextureRendering = newValue,
             ),
-          if (settingsStore.showVideo && settingsStore.useNativePlayer) ...[
+          if (settingsStore.showVideo) ...[
             const SectionHeader('Ad Blocking'),
-            ListTile(
-              title: const Text('Stream proxy'),
-              subtitle: const Text(
-                'Routes streams through a proxy to block ads. Only works with the native player.',
+            if (settingsStore.useNativePlayer) ...[
+              ListTile(
+                title: const Text('Stream proxy'),
+                subtitle: const Text(
+                  'Routes streams through a proxy to block ads. Only works with the native player.',
+                ),
+                trailing: DropdownButton<String>(
+                  value: _getSelectedProxyLabel(settingsStore.streamProxy),
+                  underline: const SizedBox.shrink(),
+                  items: _streamProxies.keys
+                      .map((label) => DropdownMenuItem(
+                            value: label,
+                            child: Text(label),
+                          ))
+                      .toList(),
+                  onChanged: (label) {
+                    if (label == null) return;
+                    HapticFeedback.selectionClick();
+                    settingsStore.streamProxy = _streamProxies[label]!;
+                  },
+                ),
               ),
-              trailing: DropdownButton<String>(
-                value: _getSelectedProxyLabel(settingsStore.streamProxy),
-                underline: const SizedBox.shrink(),
-                items: _streamProxies.keys
-                    .map((label) => DropdownMenuItem(
-                          value: label,
-                          child: Text(label),
-                        ))
-                    .toList(),
-                onChanged: (label) {
-                  if (label == null) return;
-                  HapticFeedback.selectionClick();
-                  settingsStore.streamProxy = _streamProxies[label]!;
-                },
-              ),
-            ),
-            if (settingsStore.streamProxy == 'custom')
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: TextField(
-                  decoration: const InputDecoration(
-                    hintText: 'https://your-proxy.example.com',
-                    border: OutlineInputBorder(),
-                    isDense: true,
+              if (settingsStore.streamProxy == 'custom')
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: TextField(
+                    decoration: const InputDecoration(
+                      hintText: 'https://your-proxy.example.com',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    controller: TextEditingController(
+                      text: settingsStore.customStreamProxy,
+                    ),
+                    onChanged: (value) =>
+                        settingsStore.customStreamProxy = value.trim(),
                   ),
-                  controller: TextEditingController(
-                    text: settingsStore.customStreamProxy,
+                ),
+            ] else
+              ListTile(
+                title: const Text('Ad-blocking script'),
+                subtitle: const Text(
+                  'Injects a TwitchAdSolutions script into the WebView player to block ads.',
+                ),
+                trailing: DropdownButton<String>(
+                  value: _getSelectedScriptLabel(
+                    settingsStore.webViewAdBlockScript,
                   ),
-                  onChanged: (value) =>
-                      settingsStore.customStreamProxy = value.trim(),
+                  underline: const SizedBox.shrink(),
+                  items: _webViewAdBlockScripts.keys
+                      .map((label) => DropdownMenuItem(
+                            value: label,
+                            child: Text(label),
+                          ))
+                      .toList(),
+                  onChanged: (label) {
+                    if (label == null) return;
+                    HapticFeedback.selectionClick();
+                    settingsStore.webViewAdBlockScript =
+                        _webViewAdBlockScripts[label]!;
+                  },
                 ),
               ),
           ],
@@ -148,4 +182,11 @@ String _getSelectedProxyLabel(String proxyValue) {
     if (entry.value == proxyValue) return entry.key;
   }
   return 'Custom';
+}
+
+String _getSelectedScriptLabel(String scriptValue) {
+  for (final entry in _webViewAdBlockScripts.entries) {
+    if (entry.value == scriptValue) return entry.key;
+  }
+  return 'Disabled';
 }

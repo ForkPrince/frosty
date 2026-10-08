@@ -26,6 +26,7 @@ SettingsStore _$SettingsStoreFromJson(
   ..useNativePlayer = json['useNativePlayer'] as bool? ?? true
   ..streamProxy = json['streamProxy'] as String? ?? ''
   ..customStreamProxy = json['customStreamProxy'] as String? ?? ''
+  ..webViewAdBlockScript = json['webViewAdBlockScript'] as String? ?? 'vaft'
   ..nativePlayerV52Migrated = json['nativePlayerV52Migrated'] as bool? ?? false
   ..showOverlay = json['showOverlay'] as bool? ?? true
   ..toggleableOverlay = json['toggleableOverlay'] as bool? ?? false
@@ -111,6 +112,7 @@ Map<String, dynamic> _$SettingsStoreToJson(
   'useNativePlayer': instance.useNativePlayer,
   'streamProxy': instance.streamProxy,
   'customStreamProxy': instance.customStreamProxy,
+  'webViewAdBlockScript': instance.webViewAdBlockScript,
   'nativePlayerV52Migrated': instance.nativePlayerV52Migrated,
   'showOverlay': instance.showOverlay,
   'toggleableOverlay': instance.toggleableOverlay,
@@ -390,6 +392,28 @@ mixin _$SettingsStore on _SettingsStoreBase, Store {
     _$customStreamProxyAtom.reportWrite(value, super.customStreamProxy, () {
       super.customStreamProxy = value;
     });
+  }
+
+  late final _$webViewAdBlockScriptAtom = Atom(
+    name: '_SettingsStoreBase.webViewAdBlockScript',
+    context: context,
+  );
+
+  @override
+  String get webViewAdBlockScript {
+    _$webViewAdBlockScriptAtom.reportRead();
+    return super.webViewAdBlockScript;
+  }
+
+  @override
+  set webViewAdBlockScript(String value) {
+    _$webViewAdBlockScriptAtom.reportWrite(
+      value,
+      super.webViewAdBlockScript,
+      () {
+        super.webViewAdBlockScript = value;
+      },
+    );
   }
 
   late final _$showOverlayAtom = Atom(
@@ -1287,6 +1311,7 @@ useTextureRendering: ${useTextureRendering},
 useNativePlayer: ${useNativePlayer},
 streamProxy: ${streamProxy},
 customStreamProxy: ${customStreamProxy},
+webViewAdBlockScript: ${webViewAdBlockScript},
 showOverlay: ${showOverlay},
 toggleableOverlay: ${toggleableOverlay},
 showLatency: ${showLatency},

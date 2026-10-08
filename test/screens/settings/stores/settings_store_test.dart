@@ -15,6 +15,9 @@ void main() {
       expect(store.defaultToHighestQuality, isFalse);
       expect(store.useTextureRendering, isTrue);
       expect(store.useNativePlayer, isTrue);
+      expect(store.streamProxy, isEmpty);
+      expect(store.customStreamProxy, isEmpty);
+      expect(store.webViewAdBlockScript, 'vaft');
       expect(store.showOverlay, isTrue);
       expect(store.toggleableOverlay, isFalse);
       expect(store.showLatency, isFalse);
@@ -90,6 +93,15 @@ void main() {
       expect(restored.pinnedChannelIds, ['ch1', 'ch2']);
     });
 
+    test('roundtrip preserves WebView ad-block script selection', () {
+      final store = SettingsStore.fromJson({});
+      store.webViewAdBlockScript = 'videoSwap';
+
+      final restored = SettingsStore.fromJson(store.toJson());
+
+      expect(restored.webViewAdBlockScript, 'videoSwap');
+    });
+
     test('unknown ThemeType enum value falls back to system', () {
       final store = SettingsStore.fromJson({'themeType': 'nonexistent_theme'});
       expect(store.themeType, ThemeType.system);
@@ -157,6 +169,8 @@ void main() {
       store.defaultToHighestQuality = true;
       store.useTextureRendering = false;
       store.useNativePlayer = false;
+      store.streamProxy = 'https://lb-eu.cdn-perfprod.com';
+      store.webViewAdBlockScript = '';
       store.showOverlay = false;
       store.toggleableOverlay = true;
       store.showLatency = true;
@@ -167,6 +181,8 @@ void main() {
       expect(store.defaultToHighestQuality, isFalse);
       expect(store.useTextureRendering, isTrue);
       expect(store.useNativePlayer, isTrue);
+      expect(store.streamProxy, isEmpty);
+      expect(store.webViewAdBlockScript, 'vaft');
       expect(store.showOverlay, isTrue);
       expect(store.toggleableOverlay, isFalse);
       expect(store.showLatency, isFalse);

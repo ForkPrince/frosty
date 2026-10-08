@@ -23,6 +23,13 @@ import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 
 part 'video_store.g.dart';
 
+/// Maps the [SettingsStore.webViewAdBlockScript] values to their bundled
+/// script assets (from Samtch / pixeltris' TwitchAdSolutions).
+const _adBlockAssetPaths = {
+  'vaft': 'assets/js/adblock/vaft.js',
+  'videoSwap': 'assets/js/adblock/video_swap.js',
+};
+
 class VideoStore = VideoStoreBase with _$VideoStore;
 
 abstract class VideoStoreBase with Store implements VideoPlayerInterface {
@@ -75,6 +82,10 @@ abstract class VideoStoreBase with Store implements VideoPlayerInterface {
 
   /// The video web view params used for enabling auto play.
   late final PlatformWebViewControllerCreationParams _videoWebViewParams;
+
+  /// Cache of loaded ad-block script sources, keyed by script id, so the
+  /// asset is read once per session rather than on every page load.
+  final _adBlockScriptCache = <String, String>{};
 
   /// The webview controller used for injecting JavaScript to control the webview and video player.
   late final WebViewController videoWebViewController =
@@ -183,7 +194,15 @@ abstract class VideoStoreBase with Store implements VideoPlayerInterface {
             // Every real navigation invalidates the injected JS context, so
             // every one must re-arm init. Unconditional is safe: the
             // onPageFinished handler below still filters on videoUrl.
-            onPageStarted: (url) => _needsInit = true,
+            onPageStarted: (url) {
+              _needsInit = true;
+              // The ad-block script must hook Worker/fetch before the
+              // player's own scripts execute, so inject as early as
+              // possible (same approach as Samtch).
+              if (url.startsWith('https://player.twitch.tv/')) {
+                _injectAdBlockScript();
+              }
+            },
             onPageFinished: (url) async {
               if (url != videoUrl) return;
               if (!_needsInit) return;
@@ -590,6 +609,23 @@ abstract class VideoStoreBase with Store implements VideoPlayerInterface {
       );
     } catch (e) {
       debugPrint(e.toString());
+    }
+  }
+
+  /// Injects the selected TwitchAdSolutions script (`vaft` / `video-swap`,
+  /// bundled from Samtch) into the player page. The scripts hook the page's
+  /// Worker/fetch to strip ad segments and are idempotent via a version
+  /// guard, so repeated injection across navigations is safe.
+  Future<void> _injectAdBlockScript() async {
+    final scriptId = settingsStore.webViewAdBlockScript;
+    final assetPath = _adBlockAssetPaths[scriptId];
+    if (assetPath == null) return;
+    try {
+      final script = _adBlockScriptCache[scriptId] ??= await rootBundle
+          .loadString(assetPath);
+      await videoWebViewController.runJavaScript(script);
+    } catch (e) {
+      debugPrint('VideoStore: ad-block script injection failed: $e');
     }
   }
 
