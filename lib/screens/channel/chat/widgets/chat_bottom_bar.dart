@@ -8,6 +8,7 @@ import 'package:frosty/screens/channel/chat/details/chat_details.dart';
 import 'package:frosty/screens/channel/chat/stores/chat_store.dart';
 import 'package:frosty/utils/context_extensions.dart';
 import 'package:frosty/utils/modal_bottom_sheet.dart';
+import 'package:frosty/utils/tv.dart';
 import 'package:frosty/widgets/blurred_container.dart';
 import 'package:frosty/widgets/chat_input/emote_text_span_builder.dart';
 import 'package:frosty/widgets/frosty_cached_network_image.dart';
@@ -268,6 +269,17 @@ class ChatBottomBar extends StatelessWidget {
                             child: ExtendedTextField(
                               textInputAction: TextInputAction.send,
                               focusNode: chatStore.textFieldFocusNode,
+                              // Android TV IMEs often keep composing the
+                              // whole field, which duplicates text on every
+                              // key. Disable IME suggestions on TV.
+                              autocorrect: !isTv,
+                              enableSuggestions: !isTv,
+                              smartDashesType: isTv
+                                  ? SmartDashesType.disabled
+                                  : SmartDashesType.enabled,
+                              smartQuotesType: isTv
+                                  ? SmartQuotesType.disabled
+                                  : SmartQuotesType.enabled,
                               minLines: 1,
                               maxLines: 3,
                               enabled: isEnabled,

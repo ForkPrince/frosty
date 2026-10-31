@@ -102,21 +102,7 @@ class VideoSettings extends StatelessWidget {
                 ),
               ),
               if (settingsStore.streamProxy == 'custom')
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: TextField(
-                    decoration: const InputDecoration(
-                      hintText: 'https://your-proxy.example.com',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    controller: TextEditingController(
-                      text: settingsStore.customStreamProxy,
-                    ),
-                    onChanged: (value) =>
-                        settingsStore.customStreamProxy = value.trim(),
-                  ),
-                ),
+                _CustomProxyField(settingsStore: settingsStore),
             ] else
               ListTile(
                 title: const Text('Ad-blocking script'),
@@ -170,6 +156,47 @@ class VideoSettings extends StatelessWidget {
             onChanged: (newValue) => settingsStore.showLatency = newValue,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CustomProxyField extends StatefulWidget {
+  final SettingsStore settingsStore;
+
+  const _CustomProxyField({required this.settingsStore});
+
+  @override
+  State<_CustomProxyField> createState() => _CustomProxyFieldState();
+}
+
+class _CustomProxyFieldState extends State<_CustomProxyField> {
+  late final _controller = TextEditingController(
+    text: widget.settingsStore.customStreamProxy,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: TextField(
+        controller: _controller,
+        autocorrect: false,
+        enableSuggestions: false,
+        keyboardType: TextInputType.url,
+        decoration: const InputDecoration(
+          hintText: 'https://your-proxy.example.com',
+          border: OutlineInputBorder(),
+          isDense: true,
+        ),
+        onChanged: (value) =>
+            widget.settingsStore.customStreamProxy = value.trim(),
       ),
     );
   }

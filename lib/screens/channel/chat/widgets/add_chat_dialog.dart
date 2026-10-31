@@ -141,6 +141,7 @@ class _AddChatSheetState extends State<AddChatSheet> {
                 controller: _textController,
                 focusNode: _focusNode,
                 autocorrect: false,
+                enableSuggestions: false,
                 decoration: InputDecoration(
                   prefixIcon: const Icon(Icons.search_rounded),
                   hintText: 'Search for a channel',

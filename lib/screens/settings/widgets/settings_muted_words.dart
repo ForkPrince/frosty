@@ -54,13 +54,11 @@ class _SettingsMutedWordsState extends State<SettingsMutedWords> {
                     child: TextField(
                       controller: textController,
                       focusNode: textFieldFocusNode,
-                      onChanged: (value) {
-                        textController.text = value;
-                      },
                       onSubmitted: (value) {
                         addMutedWord(value);
                       },
                       autocorrect: false,
+                      enableSuggestions: false,
                       decoration: InputDecoration(
                         hintText: 'Enter keywords to mute',
                         suffixIcon: IconButton(

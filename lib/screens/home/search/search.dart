@@ -201,6 +201,7 @@ class _SearchState extends State<Search> {
                         controller: _searchStore.textEditingController,
                         focusNode: _searchStore.textFieldFocusNode,
                         autocorrect: false,
+                        enableSuggestions: false,
                         onChanged: _searchStore.onSearchTextChanged,
                         decoration: InputDecoration(
                           prefixIcon: const Icon(Icons.search_rounded),
