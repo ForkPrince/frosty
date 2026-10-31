@@ -561,6 +561,7 @@ class _VideoChatState extends State<VideoChat>
         }
 
         return Scaffold(
+          backgroundColor: settingsStore.showVideo ? Colors.black : null,
           extendBody: true,
           extendBodyBehindAppBar: true,
           appBar: chatOnlyBlurredAppBar,
@@ -847,7 +848,7 @@ class _VideoChatState extends State<VideoChat>
       void notifyPip(bool isInPip) =>
           _videoStore.handleAndroidPipChanged(isInPip);
 
-      return PipWidget(
+      final content = PipWidget(
         pipLayout: PipActionsLayout.mediaOnlyPause,
         onPipAction: (_) => _videoStore.handlePausePlay(),
         onPipEntered: () => notifyPip(true),
@@ -855,9 +856,15 @@ class _VideoChatState extends State<VideoChat>
         pipChild: player,
         child: focusableVideoChat,
       );
+
+      return settingsStore.showVideo
+          ? ColoredBox(color: Colors.black, child: content)
+          : content;
     }
 
-    return focusableVideoChat;
+    return settingsStore.showVideo
+        ? ColoredBox(color: Colors.black, child: focusableVideoChat)
+        : focusableVideoChat;
   }
 
   @override
