@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:frosty/screens/onboarding/login_webview.dart';
+import 'package:frosty/screens/onboarding/login_route.dart';
 import 'package:frosty/screens/onboarding/onboarding_scaffold.dart';
 import 'package:frosty/screens/onboarding/onboarding_setup.dart';
 import 'package:simple_icons/simple_icons.dart';
@@ -18,7 +18,7 @@ class OnboardingLogin extends StatelessWidget {
       buttonText: 'Connect with Twitch',
       buttonIcon: const Icon(SimpleIcons.twitch),
       skipRoute: const OnboardingSetup(),
-      route: LoginWebView(routeAfter: const OnboardingSetup()),
+      route: buildLoginScreen(routeAfter: const OnboardingSetup()),
     );
   }
 }

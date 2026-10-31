@@ -145,8 +145,10 @@ mixin _$AuthStore on AuthBase, Store {
   );
 
   @override
-  Future<void> login({required String token}) {
-    return _$loginAsyncAction.run(() => super.login(token: token));
+  Future<void> login({required String token, String? refreshToken}) {
+    return _$loginAsyncAction.run(
+      () => super.login(token: token, refreshToken: refreshToken),
+    );
   }
 
   late final _$completeModeratorUpgradeAsyncAction = AsyncAction(
@@ -155,9 +157,17 @@ mixin _$AuthStore on AuthBase, Store {
   );
 
   @override
-  Future<bool> completeModeratorUpgrade({required String token}) {
+  Future<bool> completeModeratorUpgrade({
+    required String token,
+    String? refreshToken,
+    bool popOnSuccess = true,
+  }) {
     return _$completeModeratorUpgradeAsyncAction.run(
-      () => super.completeModeratorUpgrade(token: token),
+      () => super.completeModeratorUpgrade(
+        token: token,
+        refreshToken: refreshToken,
+        popOnSuccess: popOnSuccess,
+      ),
     );
   }
 

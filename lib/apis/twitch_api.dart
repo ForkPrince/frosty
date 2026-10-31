@@ -145,6 +145,85 @@ class TwitchApi extends BaseApiClient {
     return data['access_token'] as String;
   }
 
+  /// Starts Twitch's device code grant flow for devices without a usable
+  /// keyboard or browser (TVs, consoles).
+  ///
+  /// The returned [TwitchDeviceCode] is shown to the user, who authorizes it on
+  /// another device at [TwitchDeviceCode.verificationUri].
+  Future<TwitchDeviceCode> requestDeviceCode({
+    required List<String> scopes,
+  }) async {
+    final data = await post<JsonMap>(
+      '$_oauthBaseUrl/device',
+      // Twitch expects the plural `scopes` here (unlike the RFC/OAuth standard)
+      // and requires the values in the form body, not the query string.
+      data: {'client_id': clientId, 'scopes': scopes.join(' ')},
+      headers: {'Content-Type': Headers.formUrlEncodedContentType},
+    );
+
+    return TwitchDeviceCode.fromJson(data);
+  }
+
+  /// Exchanges a device code for a user token.
+  ///
+  /// Returns a pending/slow-down result until the user authorizes the code on
+  /// another device.
+  Future<TwitchDeviceTokenResult> pollDeviceToken({
+    required String deviceCode,
+  }) async {
+    try {
+      final data = await post<JsonMap>(
+        '$_oauthBaseUrl/token',
+        data: {
+          'client_id': clientId,
+          if (secret.isNotEmpty) 'client_secret': secret,
+          'device_code': deviceCode,
+          'grant_type': 'urn:ietf:params:oauth:grant-type:device_code',
+        },
+        headers: {'Content-Type': Headers.formUrlEncodedContentType},
+      );
+
+      return TwitchDeviceTokenResult.authorized(TwitchUserToken.fromJson(data));
+    } on ApiException catch (e) {
+      final message = e.message.toLowerCase();
+      if (message.contains('authorization_pending')) {
+        return const TwitchDeviceTokenResult.pending();
+      }
+      if (message.contains('slow_down')) {
+        return const TwitchDeviceTokenResult.slowDown();
+      }
+      if (message.contains('access_denied') || message.contains('denied')) {
+        return const TwitchDeviceTokenResult.denied();
+      }
+      if (message.contains('expired') ||
+          message.contains('invalid device code')) {
+        return const TwitchDeviceTokenResult.expired();
+      }
+      rethrow;
+    }
+  }
+
+  /// Refreshes an access token using a device-flow refresh token.
+  ///
+  /// Device-flow refresh tokens are single-use; callers must persist the
+  /// returned [TwitchUserToken.refreshToken] and replace the old one.
+  Future<TwitchUserToken> refreshUserToken({
+    required String refreshToken,
+  }) async {
+    final data = await post<JsonMap>(
+      '$_oauthBaseUrl/token',
+      data: {
+        'grant_type': 'refresh_token',
+        'refresh_token': refreshToken,
+        'client_id': clientId,
+        if (secret.isNotEmpty) 'client_secret': secret,
+      },
+      headers: {'Content-Type': Headers.formUrlEncodedContentType},
+    );
+
+    return TwitchUserToken.fromJson(data);
+  }
+
   /// Validates [token] with Twitch.
   ///
   /// Returns token info (scopes + optional `user_id`) when valid, or `null`
@@ -604,4 +683,83 @@ class TwitchTokenInfo {
   final String? userId;
 
   const TwitchTokenInfo({required this.scopes, this.userId});
+}
+
+/// Device authorization response from Twitch's device code grant flow.
+class TwitchDeviceCode {
+  final String deviceCode;
+  final int expiresIn;
+  final int interval;
+  final String userCode;
+  final String verificationUri;
+
+  const TwitchDeviceCode({
+    required this.deviceCode,
+    required this.expiresIn,
+    required this.interval,
+    required this.userCode,
+    required this.verificationUri,
+  });
+
+  factory TwitchDeviceCode.fromJson(JsonMap json) {
+    return TwitchDeviceCode(
+      deviceCode: json['device_code'] as String,
+      expiresIn: (json['expires_in'] as num?)?.toInt() ?? 0,
+      interval: (json['interval'] as num?)?.toInt() ?? 5,
+      userCode: json['user_code'] as String,
+      verificationUri: json['verification_uri'] as String,
+    );
+  }
+}
+
+/// Access/refresh token pair returned by the device code grant flow.
+class TwitchUserToken {
+  final String accessToken;
+  final String? refreshToken;
+  final int expiresIn;
+  final List<String> scopes;
+
+  const TwitchUserToken({
+    required this.accessToken,
+    this.refreshToken,
+    required this.expiresIn,
+    required this.scopes,
+  });
+
+  factory TwitchUserToken.fromJson(JsonMap json) {
+    final scope = json['scope'];
+    return TwitchUserToken(
+      accessToken: json['access_token'] as String,
+      refreshToken: json['refresh_token'] as String?,
+      expiresIn: (json['expires_in'] as num?)?.toInt() ?? 0,
+      scopes: scope is List
+          ? scope.map((value) => value.toString()).toList()
+          : const <String>[],
+    );
+  }
+}
+
+/// Outcome of polling a device code for its token pair.
+enum TwitchDeviceTokenStatus { authorized, pending, slowDown, denied, expired }
+
+class TwitchDeviceTokenResult {
+  final TwitchDeviceTokenStatus status;
+  final TwitchUserToken? token;
+
+  const TwitchDeviceTokenResult._(this.status, [this.token]);
+
+  const TwitchDeviceTokenResult.authorized(TwitchUserToken token)
+    : this._(TwitchDeviceTokenStatus.authorized, token);
+
+  const TwitchDeviceTokenResult.pending()
+    : this._(TwitchDeviceTokenStatus.pending);
+
+  const TwitchDeviceTokenResult.slowDown()
+    : this._(TwitchDeviceTokenStatus.slowDown);
+
+  const TwitchDeviceTokenResult.denied()
+    : this._(TwitchDeviceTokenStatus.denied);
+
+  const TwitchDeviceTokenResult.expired()
+    : this._(TwitchDeviceTokenStatus.expired);
 }

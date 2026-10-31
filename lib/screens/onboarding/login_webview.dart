@@ -1,24 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:frosty/main.dart';
 import 'package:frosty/screens/settings/stores/auth_store.dart';
 import 'package:frosty/widgets/frosty_app_bar.dart';
 import 'package:frosty/widgets/frosty_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-
-/// Pushes the atomic moderator-scopes upgrade WebView.
-void openEnableModeratorTools(AuthStore authStore, {BuildContext? context}) {
-  final navContext = context ?? navigatorKey.currentContext;
-  if (navContext == null) return;
-  Navigator.of(navContext).push(
-    MaterialPageRoute(
-      builder: (context) => Provider<AuthStore>.value(
-        value: authStore,
-        child: const LoginWebView(upgradeModeratorScopes: true),
-      ),
-    ),
-  );
-}
 
 /// Reusable WebView widget for Twitch OAuth login flow
 class LoginWebView extends StatelessWidget {

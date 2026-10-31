@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import 'package:frosty/screens/onboarding/login_webview.dart';
+import 'package:frosty/screens/onboarding/login_route.dart';
 import 'package:frosty/screens/settings/account/account_options.dart';
 import 'package:frosty/screens/settings/stores/auth_store.dart';
 import 'package:frosty/utils/modal_bottom_sheet.dart';
+import 'package:frosty/utils/tv.dart';
 import 'package:frosty/widgets/frosty_dialog.dart';
 import 'package:frosty/widgets/profile_picture.dart';
 
@@ -57,14 +58,18 @@ class ProfileCard extends StatelessWidget {
                       behavior: HitTestBehavior.opaque,
                       onTap: () {
                         final navigator = Navigator.of(context);
+                        final cannotLinkOnTv = isTv && !hasToken;
+                        final message = hasToken
+                            ? 'Your Twitch web session is linked. When using the native player, ads will be avoided on channels where you have a subscription or Twitch Turbo.'
+                            : cannotLinkOnTv
+                            ? 'Your Twitch web session cannot be linked on TV. Linking it requires the mobile app. You can still chat and view followed channels.'
+                            : 'Your Twitch web session is not linked. Log in again to avoid ads when using the native player on channels where you have a subscription or Twitch Turbo.';
                         showDialog(
                           context: context,
                           builder: (dialogContext) => FrostyDialog(
                             title: 'Web session',
-                            message: hasToken
-                                ? 'Your Twitch web session is linked. When using the native player, ads will be avoided on channels where you have a subscription or Twitch Turbo.'
-                                : 'Your Twitch web session is not linked. Log in again to avoid ads when using the native player on channels where you have a subscription or Twitch Turbo.',
-                            actions: hasToken
+                            message: message,
+                            actions: hasToken || cannotLinkOnTv
                                 ? [
                                     TextButton(
                                       onPressed:
@@ -84,7 +89,7 @@ class ProfileCard extends StatelessWidget {
                                         navigator.push(
                                           MaterialPageRoute(
                                             builder: (context) =>
-                                                LoginWebView(),
+                                                buildLoginScreen(),
                                           ),
                                         );
                                       },
@@ -128,7 +133,7 @@ class ProfileCard extends StatelessWidget {
           ),
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => LoginWebView()),
+            MaterialPageRoute(builder: (context) => buildLoginScreen()),
           ),
           onLongPress: () async {
             final clipboardText = (await Clipboard.getData(

@@ -5,6 +5,7 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:frosty/apis/base_api_client.dart';
+import 'package:frosty/apis/base_api_client.dart' as base;
 import 'package:frosty/apis/twitch_api.dart';
 import 'package:frosty/constants.dart';
 import 'package:frosty/main.dart';
@@ -16,6 +17,9 @@ import 'package:mobx/mobx.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 part 'auth_store.g.dart';
+
+/// Outcome of trying to exchange a device-flow refresh token.
+enum _TokenRefreshResult { success, rejected, transient }
 
 class AuthStore = AuthBase with _$AuthStore;
 
@@ -31,6 +35,9 @@ abstract class AuthBase with Store {
 
   /// The secure storage key for the GQL web cookie token.
   static const _gqlTokenKey = 'gql_token';
+
+  /// The secure storage key for a device-flow refresh token.
+  static const _refreshTokenKey = 'refresh_token';
 
   /// Twitch user id that opted into moderator scopes on this device.
   static const _moderatorOptInUserIdKey = 'moderator_scopes_opt_in_user_id';
@@ -61,6 +68,9 @@ abstract class AuthBase with Store {
   @readonly
   String? _gqlToken;
 
+  /// Single-use refresh token from the device code grant flow, if any.
+  String? _refreshToken;
+
   /// Whether the user is logged in or not.
   @readonly
   var _isLoggedIn = false;
@@ -79,6 +89,10 @@ abstract class AuthBase with Store {
   @computed
   bool get hasModeratorScopes =>
       twitch_scopes.hasModeratorScopes(_grantedScopes);
+
+  /// Whether the next login should request moderator scopes because this
+  /// device's account previously opted in.
+  bool get shouldRequestModeratorScopes => _shouldIncludeModeratorScopes;
 
   /// Authentication headers for Twitch API requests.
   @computed
@@ -307,6 +321,32 @@ abstract class AuthBase with Store {
     _grantedScopes = ObservableList.of(scopes);
   }
 
+  /// Crashlytics is not initialized in tests; keep auth state updates from
+  /// failing when it is unavailable.
+  void _setLoggedInCrashlytics(bool isLoggedIn) {
+    try {
+      FirebaseCrashlytics.instance.setCustomKey('is_logged_in', isLoggedIn);
+    } catch (e) {
+      debugPrint('Crashlytics unavailable: $e');
+    }
+  }
+
+  void _setCrashlyticsUserId(String userId) {
+    try {
+      FirebaseCrashlytics.instance.setUserIdentifier(userId);
+    } catch (e) {
+      debugPrint('Crashlytics unavailable: $e');
+    }
+  }
+
+  void _logCrashlytics(String message) {
+    try {
+      FirebaseCrashlytics.instance.log(message);
+    } catch (e) {
+      debugPrint('Crashlytics unavailable: $e');
+    }
+  }
+
   Future<void> _persistModeratorOptIn(String userId) async {
     if (_moderatorOptInUserId == userId) return;
     _moderatorOptInUserId = userId;
@@ -323,6 +363,50 @@ abstract class AuthBase with Store {
     }
   }
 
+  /// Exchanges the stored device-flow refresh token for a new access token.
+  ///
+  /// Twitch rotates refresh tokens on every use, so the new pair replaces the
+  /// old one in memory and secure storage. Returns `rejected` when there is no
+  /// refresh token or Twitch rejects it, and `transient` for network/server
+  /// failures that should be retried without clearing the session.
+  Future<_TokenRefreshResult> _tryRefreshToken() async {
+    final refreshToken = _refreshToken;
+    if (refreshToken == null || refreshToken.isEmpty) {
+      return _TokenRefreshResult.rejected;
+    }
+
+    try {
+      final refreshed = await twitchApi.refreshUserToken(
+        refreshToken: refreshToken,
+      );
+      _token = refreshed.accessToken;
+      _refreshToken = refreshed.refreshToken;
+      _setGrantedScopes(refreshed.scopes);
+      await _storage.write(key: _userTokenKey, value: refreshed.accessToken);
+      if (refreshed.refreshToken != null) {
+        await _storage.write(
+          key: _refreshTokenKey,
+          value: refreshed.refreshToken!,
+        );
+      } else {
+        await _storage.delete(key: _refreshTokenKey);
+      }
+      return _TokenRefreshResult.success;
+    } on base.NetworkException catch (e) {
+      debugPrint('Token refresh failed (network): $e');
+      return _TokenRefreshResult.transient;
+    } on base.TimeoutException catch (e) {
+      debugPrint('Token refresh failed (timeout): $e');
+      return _TokenRefreshResult.transient;
+    } on base.ServerException catch (e) {
+      debugPrint('Token refresh failed (server): $e');
+      return _TokenRefreshResult.transient;
+    } catch (e) {
+      debugPrint('Token refresh failed: $e');
+      return _TokenRefreshResult.rejected;
+    }
+  }
+
   /// Initialize by retrieving a token if it does not already exist.
   @action
   Future<void> init() async {
@@ -332,11 +416,13 @@ abstract class AuthBase with Store {
         _storage.read(key: _lastUserIdKey),
         _storage.read(key: _userTokenKey),
         _storage.read(key: _gqlTokenKey),
+        _storage.read(key: _refreshTokenKey),
       ]);
       _moderatorOptInUserId = stored[0];
       _lastUserId = stored[1];
       _token = stored[2];
       _gqlToken = stored[3];
+      _refreshToken = stored[4];
 
       // If the token does not exist, get the default token.
       // Otherwise, log in.
@@ -352,11 +438,9 @@ abstract class AuthBase with Store {
         _setGrantedScopes(const []);
       } else {
         // Validate the existing token. If it fails, start reconnect loop.
-        final TwitchTokenInfo info;
+        TwitchTokenInfo? validated;
         try {
-          final validated = await twitchApi.validateToken(token: _token!);
-          if (validated == null) return await logout();
-          info = validated;
+          validated = await twitchApi.validateToken(token: _token!);
         } on ApiException catch (e) {
           debugPrint('Token validation failed: $e');
           _isLoggedIn = false;
@@ -365,6 +449,35 @@ abstract class AuthBase with Store {
           return;
         }
 
+        // Device-flow access tokens expire after ~4 hours. Use the stored
+        // single-use refresh token before treating the session as invalid.
+        if (validated == null) {
+          if (_refreshToken == null) return await logout();
+          final refreshResult = await _tryRefreshToken();
+          if (refreshResult == _TokenRefreshResult.rejected) {
+            return await logout();
+          }
+          if (refreshResult == _TokenRefreshResult.transient) {
+            // Keep the session (and refresh token) and let the reconnect loop
+            // retry on the next tick.
+            _isLoggedIn = false;
+            _setGrantedScopes(const []);
+            _startReconnectLoop();
+            return;
+          }
+          try {
+            validated = await twitchApi.validateToken(token: _token!);
+          } on ApiException catch (e) {
+            debugPrint('Token validation failed: $e');
+            _isLoggedIn = false;
+            _setGrantedScopes(const []);
+            _startReconnectLoop();
+            return;
+          }
+          if (validated == null) return await logout();
+        }
+
+        final info = validated;
         _setGrantedScopes(info.scopes);
 
         // Initialize the user store.
@@ -381,7 +494,7 @@ abstract class AuthBase with Store {
         }
       }
 
-      FirebaseCrashlytics.instance.setCustomKey('is_logged_in', _isLoggedIn);
+      _setLoggedInCrashlytics(_isLoggedIn);
       _error = null;
     } catch (e) {
       debugPrint(e.toString());
@@ -390,8 +503,11 @@ abstract class AuthBase with Store {
   }
 
   /// Logs in the user with the provided [token] and updates fields accordingly upon successful login.
+  ///
+  /// [refreshToken] is only set by the device code grant flow. WebView logins
+  /// have no refresh token, so any previous device-flow session is cleared.
   @action
-  Future<void> login({required String token}) async {
+  Future<void> login({required String token, String? refreshToken}) async {
     try {
       // Validate the custom token.
       final info = await twitchApi.validateToken(token: token);
@@ -403,6 +519,14 @@ abstract class AuthBase with Store {
 
       // Store the user token.
       await _storage.write(key: _userTokenKey, value: token);
+
+      // Store or clear the device-flow refresh token.
+      _refreshToken = refreshToken;
+      if (refreshToken != null) {
+        await _storage.write(key: _refreshTokenKey, value: refreshToken);
+      } else {
+        await _storage.delete(key: _refreshTokenKey);
+      }
 
       // Initialize the user with the new token.
       await user.init();
@@ -416,8 +540,8 @@ abstract class AuthBase with Store {
         if (hasModeratorScopes) {
           await _persistModeratorOptIn(user.details!.id);
         }
-        FirebaseCrashlytics.instance.setCustomKey('is_logged_in', true);
-        FirebaseCrashlytics.instance.setUserIdentifier(user.details!.id);
+        _setLoggedInCrashlytics(true);
+        _setCrashlyticsUserId(user.details!.id);
         _stopReconnectLoop();
       }
     } catch (e) {
@@ -429,9 +553,15 @@ abstract class AuthBase with Store {
   ///
   /// Keeps the existing token until validation proves the new token is for the
   /// same user and includes every moderator scope. On any failure, the old
-  /// session is left untouched.
+  /// session is left untouched. [refreshToken] is stored when the upgrade came
+  /// from the device code grant flow. Set [popOnSuccess] to false when the
+  /// caller owns navigation (e.g. the device login screen).
   @action
-  Future<bool> completeModeratorUpgrade({required String token}) async {
+  Future<bool> completeModeratorUpgrade({
+    required String token,
+    String? refreshToken,
+    bool popOnSuccess = true,
+  }) async {
     final currentUserId = user.details?.id;
     if (currentUserId == null || !_isLoggedIn) {
       _showModeratorUpgradeFailed(
@@ -465,14 +595,19 @@ abstract class AuthBase with Store {
 
       // Commit only after all gates pass.
       _token = token;
+      _refreshToken = refreshToken;
       _setGrantedScopes(info.scopes);
       await Future.wait([
         _storage.write(key: _userTokenKey, value: token),
         _persistModeratorOptIn(currentUserId),
+        if (refreshToken != null)
+          _storage.write(key: _refreshTokenKey, value: refreshToken)
+        else
+          _storage.delete(key: _refreshTokenKey),
       ]);
       await user.refreshModeratedChannels();
 
-      navigatorKey.currentState?.pop();
+      if (popOnSuccess) navigatorKey.currentState?.pop();
       return true;
     } catch (e) {
       debugPrint('Moderator upgrade failed due to $e');
@@ -509,11 +644,13 @@ abstract class AuthBase with Store {
       final previousUserId = user.details?.id ?? _lastUserId;
       await _persistLastUserId(previousUserId);
 
-      // Delete the existing user token and GQL token.
+      // Delete the existing user token, GQL token, and device-flow refresh token.
       await _storage.delete(key: _userTokenKey);
       await _storage.delete(key: _gqlTokenKey);
+      await _storage.delete(key: _refreshTokenKey);
       _token = null;
       _gqlToken = null;
+      _refreshToken = null;
       _setGrantedScopes(const []);
 
       // Clear the user info.
@@ -531,8 +668,8 @@ abstract class AuthBase with Store {
 
       // Set the login status to logged out.
       _isLoggedIn = false;
-      FirebaseCrashlytics.instance.setCustomKey('is_logged_in', false);
-      FirebaseCrashlytics.instance.setUserIdentifier('');
+      _setLoggedInCrashlytics(false);
+      _setCrashlyticsUserId('');
 
       debugPrint('Successfully logged out');
     } catch (e) {
@@ -547,7 +684,7 @@ abstract class AuthBase with Store {
       try {
         _reconnectAttempts++;
         if (_reconnectAttempts > _maxReconnectAttempts) {
-          FirebaseCrashlytics.instance.log(
+          _logCrashlytics(
             'Auth reconnection exhausted after $_maxReconnectAttempts attempts',
           );
           await logout();
@@ -560,14 +697,45 @@ abstract class AuthBase with Store {
           return;
         }
 
-        final info = await twitchApi.validateToken(token: stored);
-        if (info == null) {
-          await logout();
+        TwitchTokenInfo? info;
+        try {
+          info = await twitchApi.validateToken(token: stored);
+        } on ApiException catch (_) {
+          // Continue trying
           return;
         }
 
-        // Token valid again — restore session.
-        _token = stored;
+        if (info == null) {
+          // Device-flow access tokens expire; try the single-use refresh token
+          // before giving up on the session.
+          if (_refreshToken == null) {
+            await logout();
+            return;
+          }
+          final refreshResult = await _tryRefreshToken();
+          if (refreshResult == _TokenRefreshResult.rejected) {
+            await logout();
+            return;
+          }
+          if (refreshResult == _TokenRefreshResult.transient) {
+            // Retry next tick; a transient failure should not clear the token.
+            return;
+          }
+          try {
+            info = await twitchApi.validateToken(token: _token!);
+          } on ApiException catch (_) {
+            // Continue trying with the refreshed token next tick.
+            return;
+          }
+          if (info == null) {
+            await logout();
+            return;
+          }
+        } else {
+          // Token valid again — restore session.
+          _token = stored;
+        }
+
         _setGrantedScopes(info.scopes);
         await user.init();
         if (user.details != null) {

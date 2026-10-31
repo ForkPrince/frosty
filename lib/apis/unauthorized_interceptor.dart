@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:frosty/main.dart';
-import 'package:frosty/screens/onboarding/login_webview.dart';
+import 'package:frosty/screens/onboarding/login_route.dart';
 import 'package:frosty/screens/settings/stores/auth_store.dart';
 import 'package:frosty/utils/twitch_oauth_scopes.dart';
 import 'package:frosty/widgets/frosty_dialog.dart';
@@ -69,7 +69,7 @@ class UnauthorizedInterceptor extends Interceptor {
             MaterialPageRoute(
               builder: (context) => Provider<AuthStore>.value(
                 value: _authStore,
-                child: const LoginWebView(),
+                child: buildLoginScreen(),
               ),
             ),
           );

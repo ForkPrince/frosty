@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:frosty/apis/base_api_client.dart';
 import 'package:frosty/screens/channel/chat/stores/chat_store.dart';
-import 'package:frosty/screens/onboarding/login_webview.dart';
+import 'package:frosty/screens/onboarding/login_route.dart';
 import 'package:frosty/screens/settings/stores/auth_store.dart';
 
 /// Moderator actions (delete / timeout / ban, plus unban) for [targetUserId],

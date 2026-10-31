@@ -119,9 +119,7 @@ void main() {
     test('throws NotFoundException for unknown user', () {
       dioAdapter.onGet(
         'https://api.twitch.tv/helix/users',
-        (server) => server.reply(200, {
-          'data': <dynamic>[],
-        }),
+        (server) => server.reply(200, {'data': <dynamic>[]}),
         queryParameters: {'login': 'doesnotexist'},
       );
 
@@ -204,9 +202,7 @@ void main() {
         }),
       );
 
-      final result = await api.getStreamsByIds(
-        userIds: ['111', '222'],
-      );
+      final result = await api.getStreamsByIds(userIds: ['111', '222']);
 
       expect(result.data, hasLength(2));
       expect(result.data[0].userName, 'User1');
@@ -248,6 +244,142 @@ void main() {
         () => api.validateToken(token: 'some_token'),
         throwsA(isA<ServerException>()),
       );
+    });
+  });
+
+  group('device code grant flow', () {
+    test(
+      'requestDeviceCode posts client id and space-delimited scopes',
+      () async {
+        dioAdapter.onPost(
+          'https://id.twitch.tv/oauth2/device',
+          (server) => server.reply(200, {
+            'device_code': 'device-123',
+            'expires_in': 1800,
+            'interval': 5,
+            'user_code': 'ABCDEFGH',
+            'verification_uri':
+                'https://www.twitch.tv/activate?device-code=ABCDEFGH',
+          }),
+          data: {'client_id': '', 'scopes': 'chat:read chat:edit'},
+        );
+
+        final code = await api.requestDeviceCode(
+          scopes: ['chat:read', 'chat:edit'],
+        );
+
+        expect(code.deviceCode, 'device-123');
+        expect(code.userCode, 'ABCDEFGH');
+        expect(code.interval, 5);
+        expect(
+          code.verificationUri,
+          'https://www.twitch.tv/activate?device-code=ABCDEFGH',
+        );
+      },
+    );
+
+    test(
+      'pollDeviceToken returns pending while authorization is pending',
+      () async {
+        dioAdapter.onPost(
+          'https://id.twitch.tv/oauth2/token',
+          (server) => server.reply(400, {
+            'status': 400,
+            'message': 'authorization_pending',
+          }),
+          data: {
+            'client_id': '',
+            'device_code': 'device-123',
+            'grant_type': 'urn:ietf:params:oauth:grant-type:device_code',
+          },
+        );
+
+        final result = await api.pollDeviceToken(deviceCode: 'device-123');
+
+        expect(result.status, TwitchDeviceTokenStatus.pending);
+        expect(result.token, isNull);
+      },
+    );
+
+    test('pollDeviceToken returns the token pair when authorized', () async {
+      dioAdapter.onPost(
+        'https://id.twitch.tv/oauth2/token',
+        (server) => server.reply(200, {
+          'access_token': 'access',
+          'refresh_token': 'refresh',
+          'expires_in': 14400,
+          'scope': ['chat:read', 'chat:edit'],
+          'token_type': 'bearer',
+        }),
+        data: {
+          'client_id': '',
+          'device_code': 'device-123',
+          'grant_type': 'urn:ietf:params:oauth:grant-type:device_code',
+        },
+      );
+
+      final result = await api.pollDeviceToken(deviceCode: 'device-123');
+
+      expect(result.status, TwitchDeviceTokenStatus.authorized);
+      expect(result.token?.accessToken, 'access');
+      expect(result.token?.refreshToken, 'refresh');
+      expect(result.token?.expiresIn, 14400);
+      expect(result.token?.scopes, ['chat:read', 'chat:edit']);
+    });
+
+    test('pollDeviceToken maps denial and expiry errors', () async {
+      dioAdapter.onPost(
+        'https://id.twitch.tv/oauth2/token',
+        (server) =>
+            server.reply(400, {'status': 400, 'message': 'access_denied'}),
+        data: {
+          'client_id': '',
+          'device_code': 'denied',
+          'grant_type': 'urn:ietf:params:oauth:grant-type:device_code',
+        },
+      );
+      dioAdapter.onPost(
+        'https://id.twitch.tv/oauth2/token',
+        (server) => server.reply(400, {
+          'status': 400,
+          'message': 'invalid device code',
+        }),
+        data: {
+          'client_id': '',
+          'device_code': 'expired',
+          'grant_type': 'urn:ietf:params:oauth:grant-type:device_code',
+        },
+      );
+
+      final denied = await api.pollDeviceToken(deviceCode: 'denied');
+      final expired = await api.pollDeviceToken(deviceCode: 'expired');
+
+      expect(denied.status, TwitchDeviceTokenStatus.denied);
+      expect(expired.status, TwitchDeviceTokenStatus.expired);
+    });
+
+    test('refreshUserToken parses the rotated token pair', () async {
+      dioAdapter.onPost(
+        'https://id.twitch.tv/oauth2/token',
+        (server) => server.reply(200, {
+          'access_token': 'new-access',
+          'refresh_token': 'new-refresh',
+          'expires_in': 14400,
+          'scope': ['chat:read'],
+          'token_type': 'bearer',
+        }),
+        data: {
+          'grant_type': 'refresh_token',
+          'refresh_token': 'old-refresh',
+          'client_id': '',
+        },
+      );
+
+      final token = await api.refreshUserToken(refreshToken: 'old-refresh');
+
+      expect(token.accessToken, 'new-access');
+      expect(token.refreshToken, 'new-refresh');
+      expect(token.scopes, ['chat:read']);
     });
   });
 
@@ -404,9 +536,7 @@ void main() {
     test('throws ApiException for nonexistent channel', () {
       dioAdapter.onGet(
         'https://api.twitch.tv/helix/channels',
-        (server) => server.reply(200, {
-          'data': <dynamic>[],
-        }),
+        (server) => server.reply(200, {'data': <dynamic>[]}),
         queryParameters: {'broadcaster_id': '99999'},
       );
 
@@ -493,11 +623,8 @@ void main() {
       );
 
       expect(
-        () => api.banUser(
-          broadcasterId: '1',
-          moderatorId: '2',
-          userIdToBan: '3',
-        ),
+        () =>
+            api.banUser(broadcasterId: '1', moderatorId: '2', userIdToBan: '3'),
         throwsA(
           isA<ApiException>().having(
             (e) => e.message,
