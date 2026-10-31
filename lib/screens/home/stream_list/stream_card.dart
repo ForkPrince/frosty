@@ -60,9 +60,8 @@ class StreamCard extends StatelessWidget {
           '-${thumbnailWidth}x$thumbnailHeight',
         ),
         cacheKey: cacheKey,
-        placeholder: (context, url) => const SkeletonLoader(
-          borderRadius: kCardBorderRadius,
-        ),
+        placeholder: (context, url) =>
+            const SkeletonLoader(borderRadius: kCardBorderRadius),
         useOldImageOnUrlChange: true,
       ),
     );
@@ -169,7 +168,9 @@ class StreamCard extends StatelessWidget {
                   ? () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        settings: const RouteSettings(name: CategoryStreams.routeName),
+                        settings: const RouteSettings(
+                          name: CategoryStreams.routeName,
+                        ),
                         builder: (context) =>
                             CategoryStreams(categoryId: streamInfo.gameId),
                       ),

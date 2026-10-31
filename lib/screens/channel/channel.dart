@@ -49,14 +49,14 @@ class _VideoChatState extends State<VideoChat>
   final _chatKey = GlobalKey();
   final _tvFocusNode = FocusNode(debugLabel: 'VideoChat TV player');
 
-  static const _tvSelectKeys = {
+  static final _tvSelectKeys = <LogicalKeyboardKey>{
     LogicalKeyboardKey.select,
     LogicalKeyboardKey.enter,
     LogicalKeyboardKey.numpadEnter,
     LogicalKeyboardKey.gameButtonA,
   };
 
-  static const _tvDpadKeys = {
+  static final _tvDpadKeys = <LogicalKeyboardKey>{
     LogicalKeyboardKey.arrowUp,
     LogicalKeyboardKey.arrowDown,
     LogicalKeyboardKey.arrowLeft,
@@ -98,22 +98,22 @@ class _VideoChatState extends State<VideoChat>
 
   late final VideoPlayerInterface _videoStore =
       context.settingsStore.useNativePlayer
-          ? NativeVideoStore(
-              userLogin: widget.userLogin,
-              userId: widget.userId,
-              displayName: widget.userName,
-              twitchApi: context.twitchApi,
-              twitchGqlApi: context.twitchGqlApi,
-              authStore: context.authStore,
-              settingsStore: context.settingsStore,
-            )
-          : VideoStore(
-              userLogin: widget.userLogin,
-              userId: widget.userId,
-              twitchApi: context.twitchApi,
-              authStore: context.authStore,
-              settingsStore: context.settingsStore,
-            );
+      ? NativeVideoStore(
+          userLogin: widget.userLogin,
+          userId: widget.userId,
+          displayName: widget.userName,
+          twitchApi: context.twitchApi,
+          twitchGqlApi: context.twitchGqlApi,
+          authStore: context.authStore,
+          settingsStore: context.settingsStore,
+        )
+      : VideoStore(
+          userLogin: widget.userLogin,
+          userId: widget.userId,
+          twitchApi: context.twitchApi,
+          authStore: context.authStore,
+          settingsStore: context.settingsStore,
+        );
 
   @override
   void initState() {
@@ -141,18 +141,17 @@ class _VideoChatState extends State<VideoChat>
 
     // When the TV overlay auto-hides, pull focus back to the player so the
     // remote can't activate an invisible control.
-    _overlayFocusReaction = reaction(
-      (_) => _videoStore.overlayVisible,
-      (visible) {
-        if (isTv &&
-            !visible &&
-            !_videoStore.paused &&
-            mounted &&
-            (ModalRoute.of(context)?.isCurrent ?? false)) {
-          _tvFocusNode.requestFocus();
-        }
-      },
-    );
+    _overlayFocusReaction = reaction((_) => _videoStore.overlayVisible, (
+      visible,
+    ) {
+      if (isTv &&
+          !visible &&
+          !_videoStore.paused &&
+          mounted &&
+          (ModalRoute.of(context)?.isCurrent ?? false)) {
+        _tvFocusNode.requestFocus();
+      }
+    });
   }
 
   KeyEventResult _handleTvKey(FocusNode node, KeyEvent event) {
@@ -221,8 +220,10 @@ class _VideoChatState extends State<VideoChat>
 
     // Update the ValueNotifier directly — only the ListenableBuilder rebuilds,
     // not the entire channel scaffold.
-    _pipDragDistance.value =
-        (_pipDragDistance.value + details.delta.dy).clamp(0, _pipMaxDragDistance);
+    _pipDragDistance.value = (_pipDragDistance.value + details.delta.dy).clamp(
+      0,
+      _pipMaxDragDistance,
+    );
 
     final wasInTriggerZone = _isInPipTriggerZone;
     _isInPipTriggerZone = _pipDragDistance.value >= _pipTriggerDistance;
@@ -269,8 +270,8 @@ class _VideoChatState extends State<VideoChat>
   }
 
   void _animateSpringBack() {
-    _springBackAnimation =
-        Tween<double>(begin: _pipDragDistance.value, end: 0).animate(
+    _springBackAnimation = Tween<double>(begin: _pipDragDistance.value, end: 0)
+        .animate(
           CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
         );
 
@@ -335,13 +336,11 @@ class _VideoChatState extends State<VideoChat>
                 if (!_videoStore.isInPipMode)
                   Positioned.fill(
                     child: IgnorePointer(
-                      ignoring:
-                          !(_isPipDragging && currentDragDistance > 0),
+                      ignoring: !(_isPipDragging && currentDragDistance > 0),
                       child: AnimatedOpacity(
-                        opacity:
-                            (_isPipDragging && currentDragDistance > 0)
-                                ? 1.0
-                                : 0.0,
+                        opacity: (_isPipDragging && currentDragDistance > 0)
+                            ? 1.0
+                            : 0.0,
                         duration: const Duration(milliseconds: 150),
                         curve: Curves.easeOut,
                         child: Container(
@@ -387,10 +386,7 @@ class _VideoChatState extends State<VideoChat>
               key: _videoKey,
               nativeVideoStore: _videoStore,
             )
-          : Video(
-              key: _videoKey,
-              videoStore: _videoStore as VideoStore,
-            ),
+          : Video(key: _videoKey, videoStore: _videoStore as VideoStore),
     );
 
     final overlay = GestureDetector(
@@ -810,10 +806,7 @@ class _VideoChatState extends State<VideoChat>
                     Column(
                       children: [
                         if (settingsStore.showVideo) ...[
-                          AspectRatio(
-                            aspectRatio: 16 / 9,
-                            child: SizedBox(),
-                          ),
+                          AspectRatio(aspectRatio: 16 / 9, child: SizedBox()),
                         ],
                         Expanded(child: chat),
                       ],
@@ -851,7 +844,8 @@ class _VideoChatState extends State<VideoChat>
       // Both players need this — the WebView store used to be skipped by a
       // NativeVideoPlayerInterface type check, so it never learned it was in
       // PiP on Android.
-      void notifyPip(bool isInPip) => _videoStore.handleAndroidPipChanged(isInPip);
+      void notifyPip(bool isInPip) =>
+          _videoStore.handleAndroidPipChanged(isInPip);
 
       return PipWidget(
         pipLayout: PipActionsLayout.mediaOnlyPause,
@@ -871,7 +865,7 @@ class _VideoChatState extends State<VideoChat>
     // Remove observer for app lifecycle events
     WidgetsBinding.instance.removeObserver(this);
 
-    _overlayFocusReaction.dispose();
+    _overlayFocusReaction();
     _tvFocusNode.dispose();
 
     _chatTabsStore.dispose();

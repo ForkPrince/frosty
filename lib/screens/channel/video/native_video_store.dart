@@ -88,8 +88,9 @@ abstract class NativeVideoStoreBase
   static final _bareResolutionRe = RegExp(r'^(\d+)p$');
 
   final _pip = SimplePip();
-  late final ChatLatencySync _chatLatencySync =
-      ChatLatencySync(settingsStore: settingsStore);
+  late final ChatLatencySync _chatLatencySync = ChatLatencySync(
+    settingsStore: settingsStore,
+  );
   late final StreamInfoPoller _streamInfoPoller = StreamInfoPoller(
     twitchApi: twitchApi,
     userLogin: userLogin,
@@ -186,17 +187,16 @@ abstract class NativeVideoStoreBase
     // `pause()` alone leaves the audio session, PiP controller, and URL
     // session alive on iOS, which blocks low-power sleep states. Full
     // dispose is the only path that deactivates the audio session.
-    _disposeVideoModeReaction = reaction(
-      (_) => settingsStore.showVideo,
-      (showVideo) {
-        if (!showVideo) {
-          _disposeController();
-          _resetPlayerStateForChatOnly();
-        } else if (_controller == null) {
-          _initFreshController();
-        }
-      },
-    );
+    _disposeVideoModeReaction = reaction((_) => settingsStore.showVideo, (
+      showVideo,
+    ) {
+      if (!showVideo) {
+        _disposeController();
+        _resetPlayerStateForChatOnly();
+      } else if (_controller == null) {
+        _initFreshController();
+      }
+    });
 
     if (Platform.isAndroid) {
       // Explicit reaction on showVideo only (vs autorun, which re-runs on any
@@ -237,11 +237,13 @@ abstract class NativeVideoStoreBase
   /// to the native player using the cached profile image.
   void _applyNowPlayingMediaInfo() {
     if (_disposed || _controller == null) return;
-    _controller!.setMediaInfo(NativeVideoPlayerMediaInfo(
-      title: displayName,
-      subtitle: _streamInfo?.title ?? 'Twitch',
-      artworkUrl: _profileImageUrl,
-    ));
+    _controller!.setMediaInfo(
+      NativeVideoPlayerMediaInfo(
+        title: displayName,
+        subtitle: _streamInfo?.title ?? 'Twitch',
+        artworkUrl: _profileImageUrl,
+      ),
+    );
   }
 
   @action
@@ -256,12 +258,15 @@ abstract class NativeVideoStoreBase
       if (_profileImageUrl != null) {
         _applyNowPlayingMediaInfo();
       } else {
-        twitchApi.getUser(id: userId).then((user) {
-          _profileImageUrl = user.profileImageUrl;
-          _applyNowPlayingMediaInfo();
-        }).catchError((e) {
-          debugPrint('NativeVideoStore: profile image fetch failed: $e');
-        });
+        twitchApi
+            .getUser(id: userId)
+            .then((user) {
+              _profileImageUrl = user.profileImageUrl;
+              _applyNowPlayingMediaInfo();
+            })
+            .catchError((e) {
+              debugPrint('NativeVideoStore: profile image fetch failed: $e');
+            });
       }
 
       await _controller!.initialize();
@@ -327,18 +332,27 @@ abstract class NativeVideoStoreBase
             if (settingsStore.defaultToHighestQuality) {
               _queueOrApplyInitialQualityIndex(1);
             } else {
-              SharedPreferences.getInstance().then((prefs) {
-                if (_disposed || _pendingQualityIndex != null) return;
-                final lastQuality =
-                    prefs.getString(lastStreamQualityKey(userLogin));
-                if (lastQuality == null) return;
-                final index = _availableStreamQualities.indexOf(lastQuality);
-                if (index != -1) {
-                  runInAction(() => _queueOrApplyInitialQualityIndex(index));
-                }
-              }).catchError((e) {
-                debugPrint('NativeVideoStore: failed to read last quality: $e');
-              });
+              SharedPreferences.getInstance()
+                  .then((prefs) {
+                    if (_disposed || _pendingQualityIndex != null) return;
+                    final lastQuality = prefs.getString(
+                      lastStreamQualityKey(userLogin),
+                    );
+                    if (lastQuality == null) return;
+                    final index = _availableStreamQualities.indexOf(
+                      lastQuality,
+                    );
+                    if (index != -1) {
+                      runInAction(
+                        () => _queueOrApplyInitialQualityIndex(index),
+                      );
+                    }
+                  })
+                  .catchError((e) {
+                    debugPrint(
+                      'NativeVideoStore: failed to read last quality: $e',
+                    );
+                  });
             }
           }
         });
@@ -398,12 +412,12 @@ abstract class NativeVideoStoreBase
       }
     }
 
-    if (_disposed || generation != _initGeneration || !settingsStore.showVideo) {
+    if (_disposed ||
+        generation != _initGeneration ||
+        !settingsStore.showVideo) {
       return;
     }
-    runInAction(
-      () => _restrictedStreamQualities = token.restrictedQualities,
-    );
+    runInAction(() => _restrictedStreamQualities = token.restrictedQualities);
 
     // Resolve the stream proxy: use the custom URL if a custom proxy is
     // selected, otherwise use the preset value directly.
@@ -421,7 +435,9 @@ abstract class NativeVideoStoreBase
       url: hlsUrl,
       headers: TwitchGqlApi.playbackHttpHeaders,
     );
-    if (_disposed || generation != _initGeneration || !settingsStore.showVideo) {
+    if (_disposed ||
+        generation != _initGeneration ||
+        !settingsStore.showVideo) {
       return;
     }
     await _controller!.configureForLivePlayback();
@@ -446,10 +462,7 @@ abstract class NativeVideoStoreBase
         e,
         stackTrace,
         'Native video load failed',
-        information: [
-          'channel=$userLogin',
-          'attempt=$_totalRefreshAttempts',
-        ],
+        information: ['channel=$userLogin', 'attempt=$_totalRefreshAttempts'],
       );
     }
 
@@ -699,7 +712,9 @@ abstract class NativeVideoStoreBase
     // If the player auto-paused during startup/buffering before playing once,
     // and the user didn't explicitly pause it, force resume and trigger recovery.
     if (!_userPaused && !_hasPlayedOnce && !_initializing && _error == null) {
-      debugPrint('NativeVideoStore: auto-paused before first play, triggering play');
+      debugPrint(
+        'NativeVideoStore: auto-paused before first play, triggering play',
+      );
       _controller?.play();
       _startStallRecoveryTimer();
     }
@@ -758,8 +773,8 @@ abstract class NativeVideoStoreBase
 
   void _showStallError() {
     debugPrint('NativeVideoStore: max recovery attempts reached');
-    final bouncing = _shortPlayBounceCount >=
-        VideoTimingConstants.shortPlayLoopThreshold;
+    final bouncing =
+        _shortPlayBounceCount >= VideoTimingConstants.shortPlayLoopThreshold;
     runInAction(() {
       _loading = false;
       _showErrorOverlay(
@@ -789,9 +804,7 @@ abstract class NativeVideoStoreBase
   void _scheduleHealthyPlaybackRecoveryReset(DateTime playingStartedAt) {
     _healthyPlaybackTimer?.cancel();
     _healthyPlaybackTimer = Timer(VideoTimingConstants.shortPlayWindow, () {
-      if (_disposed ||
-          _isStalled ||
-          _lastPlayingStart != playingStartedAt) {
+      if (_disposed || _isStalled || _lastPlayingStart != playingStartedAt) {
         return;
       }
       runInAction(() {
@@ -807,8 +820,10 @@ abstract class NativeVideoStoreBase
   /// since the last refresh, or when no refresh has happened yet.
   Duration _backoffDelayRemaining() {
     if (_lastRefreshTime == null) return Duration.zero;
-    final idx = _totalRefreshAttempts
-        .clamp(0, VideoTimingConstants.refreshBackoff.length - 1);
+    final idx = _totalRefreshAttempts.clamp(
+      0,
+      VideoTimingConstants.refreshBackoff.length - 1,
+    );
     final required = VideoTimingConstants.refreshBackoff[idx];
     final elapsed = DateTime.now().difference(_lastRefreshTime!);
     final remaining = required - elapsed;
@@ -843,7 +858,10 @@ abstract class NativeVideoStoreBase
     await updateStreamInfo(forceUpdate: true);
     if (_disposed) return;
 
-    if (wasOffline && _streamInfo != null && settingsStore.showVideo && !_userPaused) {
+    if (wasOffline &&
+        _streamInfo != null &&
+        settingsStore.showVideo &&
+        !_userPaused) {
       debugPrint(
         'NativeVideoStore: stream detected back online, auto-refreshing',
       );
@@ -885,8 +903,7 @@ abstract class NativeVideoStoreBase
       // Either way, looping seeks/refreshes forever makes playback worse.
       // The counter survives refreshes and only resets on a healthy
       // reading, so a persistent condition stops recovery permanently.
-      if (_highLatencyCount >
-          VideoTimingConstants.maxHighLatencyRecoveries) {
+      if (_highLatencyCount > VideoTimingConstants.maxHighLatencyRecoveries) {
         return;
       }
       if (_isInPipMode || _highLatencyCount == 1) {

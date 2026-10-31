@@ -58,9 +58,8 @@ class LargeStreamCard extends StatelessWidget {
               '-${thumbnailWidth}x$thumbnailHeight',
             ),
             cacheKey: cacheKey,
-            placeholder: (context, url) => const SkeletonLoader(
-              borderRadius: kCardBorderRadius,
-            ),
+            placeholder: (context, url) =>
+                const SkeletonLoader(borderRadius: kCardBorderRadius),
             useOldImageOnUrlChange: true,
           ),
         ),

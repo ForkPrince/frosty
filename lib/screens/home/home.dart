@@ -253,8 +253,9 @@ class _HomeState extends State<Home> {
                       NavigationDestination(
                         icon: Icon(
                           Icons.arrow_upward_rounded,
-                          color: theme.colorScheme.onSurfaceVariant
-                              .withValues(alpha: 0.5),
+                          color: theme.colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.5,
+                          ),
                         ),
                         selectedIcon: Icon(
                           Icons.arrow_upward_rounded,
@@ -266,8 +267,9 @@ class _HomeState extends State<Home> {
                       NavigationDestination(
                         icon: Icon(
                           Icons.search_rounded,
-                          color: theme.colorScheme.onSurfaceVariant
-                              .withValues(alpha: 0.5),
+                          color: theme.colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.5,
+                          ),
                         ),
                         selectedIcon: Icon(
                           Icons.search_rounded,

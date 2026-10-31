@@ -61,9 +61,8 @@ class CategoryCard extends StatelessWidget {
                         null,
                         '${artWidth}x$artHeight.jpg',
                       ),
-                      placeholder: (context, url) => const SkeletonLoader(
-                        borderRadius: kCardBorderRadius,
-                      ),
+                      placeholder: (context, url) =>
+                          const SkeletonLoader(borderRadius: kCardBorderRadius),
                     ),
                   ),
                 ),

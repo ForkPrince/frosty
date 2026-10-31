@@ -49,8 +49,9 @@ abstract class VideoStoreBase with Store implements VideoPlayerInterface {
 
   /// The [SimplePip] instance used for initiating PiP on Android.
   final pip = SimplePip();
-  late final ChatLatencySync _chatLatencySync =
-      ChatLatencySync(settingsStore: settingsStore);
+  late final ChatLatencySync _chatLatencySync = ChatLatencySync(
+    settingsStore: settingsStore,
+  );
   late final StreamInfoPoller _streamInfoPoller = StreamInfoPoller(
     twitchApi: twitchApi,
     userLogin: userLogin,
@@ -109,7 +110,8 @@ abstract class VideoStoreBase with Store implements VideoPlayerInterface {
             // Intentionally skips the chat delay sync — the stale value
             // would desync chat further. Recovery will restore it.
             if (latencyAsDouble != null &&
-                latencyAsDouble >= VideoTimingConstants.highLatencyThresholdSeconds &&
+                latencyAsDouble >=
+                    VideoTimingConstants.highLatencyThresholdSeconds &&
                 !_paused &&
                 !_loading) {
               _highLatencyCount++;
@@ -159,8 +161,9 @@ abstract class VideoStoreBase with Store implements VideoPlayerInterface {
                 return;
               }
               final prefs = await SharedPreferences.getInstance();
-              final lastStreamQuality =
-                  prefs.getString(lastStreamQualityKey(userLogin));
+              final lastStreamQuality = prefs.getString(
+                lastStreamQualityKey(userLogin),
+              );
               if (lastStreamQuality == null) return;
               setStreamQuality(lastStreamQuality);
             }
@@ -392,10 +395,7 @@ abstract class VideoStoreBase with Store implements VideoPlayerInterface {
           // value (e.g. from showLatency tracking), apply it immediately instead
           // of waiting for the next tracker cycle (up to 60s).
           if (autoSync && _latency != null) {
-            final numericPart = _latency!.replaceAll(
-              RegExp(r'[^0-9.]'),
-              '',
-            );
+            final numericPart = _latency!.replaceAll(RegExp(r'[^0-9.]'), '');
             final latencyAsDouble = double.tryParse(numericPart);
             if (latencyAsDouble != null) {
               _chatLatencySync.report(latencyAsDouble);
