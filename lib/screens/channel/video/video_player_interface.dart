@@ -30,6 +30,13 @@ abstract class VideoPlayerInterface {
   String? get latency;
 
   void handleVideoTap();
+
+  /// Restarts the overlay auto-hide timer after remote/keyboard interaction.
+  ///
+  /// TV controls need to stay visible while the user navigates them with a
+  /// D-pad, even though they do not generate touch taps.
+  void keepOverlayVisible();
+
   void handlePausePlay();
   void handleToggleOverlay();
   Future<void> handleRefresh();

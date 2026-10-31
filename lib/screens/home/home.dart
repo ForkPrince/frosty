@@ -10,6 +10,7 @@ import 'package:frosty/screens/settings/settings.dart';
 import 'package:frosty/screens/settings/stores/auth_store.dart';
 import 'package:frosty/screens/settings/stores/settings_store.dart';
 import 'package:frosty/screens/settings/widgets/release_notes.dart';
+import 'package:frosty/utils/tv.dart';
 import 'package:frosty/widgets/blurred_container.dart';
 import 'package:frosty/widgets/profile_picture.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -59,162 +60,234 @@ class _HomeState extends State<Home> {
     checkAndShowReleaseNotes();
   }
 
-  @override
-  Widget build(BuildContext context) {
+  void _handleDestinationSelected(int index) {
+    if (index != _homeStore.selectedIndex) {
+      HapticFeedback.selectionClick();
+    }
+    _homeStore.handleTap(index);
+  }
+
+  Widget _buildTvNavigationRail(BuildContext context) {
     final theme = Theme.of(context);
 
-    return GestureDetector(
-      onTap: FocusScope.of(context).unfocus,
-      child: Scaffold(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        extendBody: true,
-        extendBodyBehindAppBar: true,
-        appBar: AppBar(
-          centerTitle: false,
-          elevation: 0,
+    return Padding(
+      padding: EdgeInsets.only(
+        top: MediaQuery.paddingOf(context).top + kToolbarHeight,
+        bottom: MediaQuery.paddingOf(context).bottom,
+      ),
+      child: Observer(
+        builder: (_) => NavigationRail(
           backgroundColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
-          titleSpacing: 16,
-          systemOverlayStyle: SystemUiOverlayStyle(
-            statusBarColor: Colors.transparent,
-            statusBarIconBrightness: theme.brightness == Brightness.dark
-                ? Brightness.light
-                : Brightness.dark,
+          selectedIndex: _homeStore.selectedIndex,
+          onDestinationSelected: _handleDestinationSelected,
+          labelType: NavigationRailLabelType.all,
+          groupAlignment: -0.9,
+          selectedIconTheme: IconThemeData(color: theme.colorScheme.primary),
+          unselectedIconTheme: IconThemeData(
+            color: theme.colorScheme.onSurfaceVariant,
           ),
-          flexibleSpace: Observer(
-            builder: (_) {
-              // Only show flexible space on Following tab (when logged in)
-              final isOnFollowingTab =
-                  _authStore.isLoggedIn && _homeStore.selectedIndex == 0;
-
-              if (!isOnFollowingTab) return const SizedBox.shrink();
-
-              return BlurredContainer(
-                gradientDirection: GradientDirection.up,
-                child: const SizedBox.expand(),
-              );
-            },
+          selectedLabelTextStyle: TextStyle(
+            color: theme.colorScheme.primary,
+            fontWeight: FontWeight.w600,
           ),
-          title: Observer(
-            builder: (_) {
-              final titles = [
-                if (_authStore.isLoggedIn) 'Following',
-                'Top',
-                'Search',
-              ];
-
-              return Text(titles[_homeStore.selectedIndex]);
-            },
+          unselectedLabelTextStyle: TextStyle(
+            color: theme.colorScheme.onSurfaceVariant,
           ),
-          actions: [
-            Observer(
-              builder: (_) {
-                final isLoggedIn =
-                    _authStore.isLoggedIn && _authStore.user.details != null;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: IconButton(
-                    tooltip: 'Settings',
-                    icon: isLoggedIn
-                        ? ProfilePicture(
-                            userLogin: _authStore.user.details!.login,
-                            radius: 16,
-                          )
-                        : const Icon(Icons.settings_rounded),
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        settings: const RouteSettings(name: Settings.routeName),
-                        builder: (context) => Settings(
-                          settingsStore: context.read<SettingsStore>(),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
+          destinations: [
+            if (_authStore.isLoggedIn)
+              const NavigationRailDestination(
+                icon: Icon(Icons.favorite_border_rounded),
+                selectedIcon: Icon(Icons.favorite_rounded),
+                label: Text('Following'),
+              ),
+            const NavigationRailDestination(
+              icon: Icon(Icons.arrow_upward_rounded),
+              selectedIcon: Icon(Icons.arrow_upward_rounded),
+              label: Text('Top'),
+            ),
+            const NavigationRailDestination(
+              icon: Icon(Icons.search_rounded),
+              selectedIcon: Icon(Icons.search_rounded),
+              label: Text('Search'),
             ),
           ],
         ),
-        body: Observer(
-          builder: (_) => IndexedStack(
-            index: _homeStore.selectedIndex,
-            children: [
-              if (_authStore.isLoggedIn)
-                StreamsList(
-                  listType: ListType.followed,
-                  scrollController: _homeStore.followedScrollController,
-                ),
-              TopSection(homeStore: _homeStore),
-              Search(scrollController: _homeStore.searchScrollController),
-            ],
-          ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final onTv = isTv;
+
+    final body = Observer(
+      builder: (_) => IndexedStack(
+        index: _homeStore.selectedIndex,
+        children: [
+          if (_authStore.isLoggedIn)
+            StreamsList(
+              listType: ListType.followed,
+              scrollController: _homeStore.followedScrollController,
+            ),
+          TopSection(homeStore: _homeStore),
+          Search(scrollController: _homeStore.searchScrollController),
+        ],
+      ),
+    );
+
+    final scaffold = Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      extendBody: true,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        centerTitle: false,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        titleSpacing: 16,
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: theme.brightness == Brightness.dark
+              ? Brightness.light
+              : Brightness.dark,
         ),
-        bottomNavigationBar: BlurredContainer(
-          gradientDirection: GradientDirection.down,
-          child: Observer(
-            builder: (_) => Theme(
-              data: Theme.of(
-                context,
-              ).copyWith(splashFactory: NoSplash.splashFactory),
-              child: NavigationBar(
-                backgroundColor: Colors.transparent,
-                surfaceTintColor: Colors.transparent,
-                elevation: 0,
-                destinations: [
-                  if (_authStore.isLoggedIn)
-                    NavigationDestination(
-                      icon: Icon(
-                        Icons.favorite_border_rounded,
-                        color: theme.colorScheme.onSurfaceVariant
-                            .withValues(alpha: 0.5),
+        flexibleSpace: Observer(
+          builder: (_) {
+            // Only show flexible space on Following tab (when logged in)
+            final isOnFollowingTab =
+                _authStore.isLoggedIn && _homeStore.selectedIndex == 0;
+
+            if (!isOnFollowingTab) return const SizedBox.shrink();
+
+            return BlurredContainer(
+              gradientDirection: GradientDirection.up,
+              child: const SizedBox.expand(),
+            );
+          },
+        ),
+        title: Observer(
+          builder: (_) {
+            final titles = [
+              if (_authStore.isLoggedIn) 'Following',
+              'Top',
+              'Search',
+            ];
+
+            return Text(titles[_homeStore.selectedIndex]);
+          },
+        ),
+        actions: [
+          Observer(
+            builder: (_) {
+              final isLoggedIn =
+                  _authStore.isLoggedIn && _authStore.user.details != null;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: IconButton(
+                  tooltip: 'Settings',
+                  icon: isLoggedIn
+                      ? ProfilePicture(
+                          userLogin: _authStore.user.details!.login,
+                          radius: 16,
+                        )
+                      : const Icon(Icons.settings_rounded),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      settings: const RouteSettings(name: Settings.routeName),
+                      builder: (context) => Settings(
+                        settingsStore: context.read<SettingsStore>(),
                       ),
-                      selectedIcon: Icon(
-                        Icons.favorite_rounded,
-                        color: theme.colorScheme.primary,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      body: onTv
+          ? Row(
+              children: [
+                _buildTvNavigationRail(context),
+                Padding(
+                  padding: EdgeInsets.only(
+                    top: MediaQuery.paddingOf(context).top + kToolbarHeight,
+                    bottom: MediaQuery.paddingOf(context).bottom,
+                  ),
+                  child: const VerticalDivider(width: 1),
+                ),
+                Expanded(child: body),
+              ],
+            )
+          : body,
+      bottomNavigationBar: onTv
+          ? null
+          : BlurredContainer(
+              gradientDirection: GradientDirection.down,
+              child: Observer(
+                builder: (_) => Theme(
+                  data: Theme.of(
+                    context,
+                  ).copyWith(splashFactory: NoSplash.splashFactory),
+                  child: NavigationBar(
+                    backgroundColor: Colors.transparent,
+                    surfaceTintColor: Colors.transparent,
+                    elevation: 0,
+                    destinations: [
+                      if (_authStore.isLoggedIn)
+                        NavigationDestination(
+                          icon: Icon(
+                            Icons.favorite_border_rounded,
+                            color: theme.colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.5),
+                          ),
+                          selectedIcon: Icon(
+                            Icons.favorite_rounded,
+                            color: theme.colorScheme.primary,
+                          ),
+                          label: 'Following',
+                          tooltip: 'Following',
+                        ),
+                      NavigationDestination(
+                        icon: Icon(
+                          Icons.arrow_upward_rounded,
+                          color: theme.colorScheme.onSurfaceVariant
+                              .withValues(alpha: 0.5),
+                        ),
+                        selectedIcon: Icon(
+                          Icons.arrow_upward_rounded,
+                          color: theme.colorScheme.primary,
+                        ),
+                        label: 'Top',
+                        tooltip: 'Top',
                       ),
-                      label: 'Following',
-                      tooltip: 'Following',
-                    ),
-                  NavigationDestination(
-                    icon: Icon(
-                      Icons.arrow_upward_rounded,
-                      color: theme.colorScheme.onSurfaceVariant
-                          .withValues(alpha: 0.5),
-                    ),
-                    selectedIcon: Icon(
-                      Icons.arrow_upward_rounded,
-                      color: theme.colorScheme.primary,
-                    ),
-                    label: 'Top',
-                    tooltip: 'Top',
+                      NavigationDestination(
+                        icon: Icon(
+                          Icons.search_rounded,
+                          color: theme.colorScheme.onSurfaceVariant
+                              .withValues(alpha: 0.5),
+                        ),
+                        selectedIcon: Icon(
+                          Icons.search_rounded,
+                          color: theme.colorScheme.primary,
+                        ),
+                        label: 'Search',
+                        tooltip: 'Search',
+                      ),
+                    ],
+                    selectedIndex: _homeStore.selectedIndex,
+                    onDestinationSelected: _handleDestinationSelected,
                   ),
-                  NavigationDestination(
-                    icon: Icon(
-                      Icons.search_rounded,
-                      color: theme.colorScheme.onSurfaceVariant
-                          .withValues(alpha: 0.5),
-                    ),
-                    selectedIcon: Icon(
-                      Icons.search_rounded,
-                      color: theme.colorScheme.primary,
-                    ),
-                    label: 'Search',
-                    tooltip: 'Search',
-                  ),
-                ],
-                selectedIndex: _homeStore.selectedIndex,
-                onDestinationSelected: (index) {
-                  if (index != _homeStore.selectedIndex) {
-                    HapticFeedback.selectionClick();
-                  }
-                  _homeStore.handleTap(index);
-                },
+                ),
               ),
             ),
-          ),
-        ),
-      ),
+    );
+
+    return GestureDetector(
+      onTap: FocusScope.of(context).unfocus,
+      child: onTv ? FocusScope(autofocus: true, child: scaffold) : scaffold,
     );
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:frosty/utils/tv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class OnboardingScaffold extends StatelessWidget {
@@ -31,10 +32,14 @@ class OnboardingScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
+    final onTv = isTv;
+
+    if (!onTv) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+    }
 
     if (isLast) {
       SharedPreferences.getInstance().then(
@@ -50,7 +55,7 @@ class OnboardingScaffold extends StatelessWidget {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 50, 20, 20),
+                padding: EdgeInsets.fromLTRB(20, onTv ? 24 : 50, 20, 20),
                 child: Column(
                   spacing: 24,
                   children: [
@@ -63,8 +68,8 @@ class OnboardingScaffold extends StatelessWidget {
                         ],
                         Text(
                           header,
-                          style: const TextStyle(
-                            fontSize: 48,
+                          style: TextStyle(
+                            fontSize: onTv ? 40 : 48,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -110,6 +115,7 @@ class OnboardingScaffold extends StatelessWidget {
                 margin: const EdgeInsets.symmetric(horizontal: 12),
                 width: double.infinity,
                 child: FilledButton.icon(
+                  autofocus: onTv,
                   onPressed: () => isLast
                       ? Navigator.pushAndRemoveUntil(
                           context,

@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:frosty/constants.dart';
+import 'package:frosty/utils/tv.dart';
 
 // --- Contrast helpers ---
 double _linearize(double c) =>
@@ -119,4 +120,6 @@ Future<void> initUtils() async {
       _isIPad = true;
     }
   }
+
+  await detectTvDevice();
 }

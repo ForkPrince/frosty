@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Flutter Twitch client for iOS and Android. MobX with `build_runner`. The landing page is `web/` (own `AGENTS.md`). Flutter is pinned in `pubspec.yaml` `environment.flutter` — bump that one field; CI reads it via `flutter-version-file`.
+Flutter Twitch client for iOS, Android, and Android TV. MobX with `build_runner`. The landing page is `web/` (own `AGENTS.md`). Flutter is pinned in `pubspec.yaml` `environment.flutter` — bump that one field; CI reads it via `flutter-version-file`.
 
 ## Commands
 

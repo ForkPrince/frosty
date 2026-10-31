@@ -11,6 +11,7 @@ import 'package:frosty/widgets/alert_message.dart';
 import 'package:frosty/widgets/live_indicator.dart';
 import 'package:frosty/widgets/profile_picture.dart';
 import 'package:frosty/widgets/skeleton_loader.dart';
+import 'package:frosty/widgets/tv_focus_border.dart';
 import 'package:frosty/widgets/uptime.dart';
 import 'package:frosty/widgets/user_actions_modal.dart';
 import 'package:mobx/mobx.dart';
@@ -117,46 +118,50 @@ class _SearchResultsChannelsState extends State<SearchResultsChannels> {
                     channel.broadcasterLogin,
                   );
 
-                  return InkWell(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        settings: const RouteSettings(name: VideoChat.routeName),
-                        builder: (context) => VideoChat(
-                          userId: channel.id,
-                          userName: channel.displayName,
-                          userLogin: channel.broadcasterLogin,
+                  return TvFocusBorder(
+                    child: InkWell(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          settings: const RouteSettings(
+                            name: VideoChat.routeName,
+                          ),
+                          builder: (context) => VideoChat(
+                            userId: channel.id,
+                            userName: channel.displayName,
+                            userLogin: channel.broadcasterLogin,
+                          ),
                         ),
                       ),
-                    ),
-                    onLongPress: () {
-                      HapticFeedback.mediumImpact();
+                      onLongPress: () {
+                        HapticFeedback.mediumImpact();
 
-                      showModalBottomSheetWithProperFocus(
-                        context: context,
-                        builder: (context) => UserActionsModal(
-                          authStore: widget.searchStore.authStore,
-                          name: displayName,
+                        showModalBottomSheetWithProperFocus(
+                          context: context,
+                          builder: (context) => UserActionsModal(
+                            authStore: widget.searchStore.authStore,
+                            name: displayName,
+                            userLogin: channel.broadcasterLogin,
+                            userId: channel.id,
+                          ),
+                        );
+                      },
+                      child: ListTile(
+                        title: Text(displayName),
+                        leading: ProfilePicture(
                           userLogin: channel.broadcasterLogin,
-                          userId: channel.id,
+                          radius: 16,
                         ),
-                      );
-                    },
-                    child: ListTile(
-                      title: Text(displayName),
-                      leading: ProfilePicture(
-                        userLogin: channel.broadcasterLogin,
-                        radius: 16,
+                        subtitle: channel.isLive
+                            ? Row(
+                                spacing: 6,
+                                children: [
+                                  const LiveIndicator(),
+                                  Uptime(startTime: channel.startedAt),
+                                ],
+                              )
+                            : null,
                       ),
-                      subtitle: channel.isLive
-                          ? Row(
-                              spacing: 6,
-                              children: [
-                                const LiveIndicator(),
-                                Uptime(startTime: channel.startedAt),
-                              ],
-                            )
-                          : null,
                     ),
                   );
                 }),

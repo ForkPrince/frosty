@@ -62,6 +62,7 @@ The official Twitch mobile app doesn't support emotes from [7TV](https://chrome.
 
 - Support for 7TV, BetterTTV, and FrankerFaceZ emotes and badges
 - Browse followed streams, top streams, and top categories
+- Android TV and Fire TV support with D-pad navigation
 - Autocomplete for emotes and user mentions
 - Light, dark, and black (OLED) themes
 - Search for channels and categories

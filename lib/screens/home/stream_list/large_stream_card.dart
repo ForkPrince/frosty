@@ -11,6 +11,7 @@ import 'package:frosty/utils.dart';
 import 'package:frosty/utils/modal_bottom_sheet.dart';
 import 'package:frosty/widgets/frosty_cached_network_image.dart';
 import 'package:frosty/widgets/skeleton_loader.dart';
+import 'package:frosty/widgets/tv_focus_border.dart';
 import 'package:frosty/widgets/user_actions_modal.dart';
 import 'package:provider/provider.dart';
 
@@ -71,50 +72,52 @@ class LargeStreamCard extends StatelessWidget {
       streamInfo.userLogin,
     );
 
-    return InkWell(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          settings: const RouteSettings(name: VideoChat.routeName),
-          builder: (context) => VideoChat(
-            userId: streamInfo.userId,
-            userName: streamInfo.userName,
-            userLogin: streamInfo.userLogin,
-          ),
-        ),
-      ),
-      onLongPress: () {
-        HapticFeedback.mediumImpact();
-
-        showModalBottomSheetWithProperFocus(
-          context: context,
-          builder: (context) => UserActionsModal(
-            authStore: context.read<AuthStore>(),
-            name: streamerName,
-            userLogin: streamInfo.userLogin,
-            userId: streamInfo.userId,
-            showPinOption: showPinOption,
-            isPinned: isPinned,
-          ),
-        );
-      },
-      child: Padding(
-        padding: EdgeInsets.only(
-          top: showThumbnail ? 12 : 4,
-          bottom: showThumbnail ? 12 : 4,
-          left: 16 + MediaQuery.of(context).padding.left,
-          right: 16 + MediaQuery.of(context).padding.right,
-        ),
-        child: Column(
-          children: [
-            if (showThumbnail) thumbnail,
-            StreamInfoBar(
-              streamInfo: streamInfo,
-              showCategory: showCategory,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              tooltipTriggerMode: TooltipTriggerMode.longPress,
+    return TvFocusBorder(
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            settings: const RouteSettings(name: VideoChat.routeName),
+            builder: (context) => VideoChat(
+              userId: streamInfo.userId,
+              userName: streamInfo.userName,
+              userLogin: streamInfo.userLogin,
             ),
-          ],
+          ),
+        ),
+        onLongPress: () {
+          HapticFeedback.mediumImpact();
+
+          showModalBottomSheetWithProperFocus(
+            context: context,
+            builder: (context) => UserActionsModal(
+              authStore: context.read<AuthStore>(),
+              name: streamerName,
+              userLogin: streamInfo.userLogin,
+              userId: streamInfo.userId,
+              showPinOption: showPinOption,
+              isPinned: isPinned,
+            ),
+          );
+        },
+        child: Padding(
+          padding: EdgeInsets.only(
+            top: showThumbnail ? 12 : 4,
+            bottom: showThumbnail ? 12 : 4,
+            left: 16 + MediaQuery.of(context).padding.left,
+            right: 16 + MediaQuery.of(context).padding.right,
+          ),
+          child: Column(
+            children: [
+              if (showThumbnail) thumbnail,
+              StreamInfoBar(
+                streamInfo: streamInfo,
+                showCategory: showCategory,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                tooltipTriggerMode: TooltipTriggerMode.longPress,
+              ),
+            ],
+          ),
         ),
       ),
     );

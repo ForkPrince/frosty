@@ -963,6 +963,13 @@ abstract class NativeVideoStoreBase
   }
 
   @override
+  void keepOverlayVisible() {
+    if (_overlayVisible && !_isInPipMode) {
+      _scheduleOverlayHide();
+    }
+  }
+
+  @override
   void handlePausePlay() {
     if (_pendingRefreshOnResume) {
       // The playback session died while user-paused (token expiry, media

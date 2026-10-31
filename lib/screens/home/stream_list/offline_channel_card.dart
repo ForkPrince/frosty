@@ -6,6 +6,7 @@ import 'package:frosty/screens/settings/stores/auth_store.dart';
 import 'package:frosty/utils.dart';
 import 'package:frosty/utils/modal_bottom_sheet.dart';
 import 'package:frosty/widgets/profile_picture.dart';
+import 'package:frosty/widgets/tv_focus_border.dart';
 import 'package:frosty/widgets/user_actions_modal.dart';
 import 'package:provider/provider.dart';
 
@@ -53,74 +54,76 @@ class OfflineChannelCard extends StatelessWidget {
           'Following for ${followedDuration.inMinutes} ${followedDuration.inMinutes == 1 ? 'minute' : 'minutes'}';
     }
 
-    return InkWell(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          settings: const RouteSettings(name: VideoChat.routeName),
-          builder: (context) => VideoChat(
-            userId: channelInfo.broadcasterId,
-            userName: channelInfo.broadcasterName,
-            userLogin: channelInfo.broadcasterLogin,
-          ),
-        ),
-      ),
-      onLongPress: () {
-        HapticFeedback.mediumImpact();
-
-        showModalBottomSheetWithProperFocus(
-          context: context,
-          builder: (context) => UserActionsModal(
-            authStore: context.read<AuthStore>(),
-            name: channelName,
-            userLogin: channelInfo.broadcasterLogin,
-            userId: channelInfo.broadcasterId,
-            showPinOption: showPinOption,
-            isPinned: isPinned,
-          ),
-        );
-      },
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          16 + MediaQuery.of(context).padding.left,
-          8,
-          16 + MediaQuery.of(context).padding.right,
-          8,
-        ),
-        child: Row(
-          spacing: 12,
-          children: [
-            // Profile picture
-            ProfilePicture(userLogin: channelInfo.broadcasterLogin),
-            // Channel info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Channel name
-                  Text(
-                    channelName,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: fontColor,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  // Status and follow duration
-                  Text(
-                    showOfflineStatus ? 'Offline' : followedText,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: fontColor?.withValues(alpha: 0.6),
-                    ),
-                  ),
-                ],
-              ),
+    return TvFocusBorder(
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            settings: const RouteSettings(name: VideoChat.routeName),
+            builder: (context) => VideoChat(
+              userId: channelInfo.broadcasterId,
+              userName: channelInfo.broadcasterName,
+              userLogin: channelInfo.broadcasterLogin,
             ),
-          ],
+          ),
+        ),
+        onLongPress: () {
+          HapticFeedback.mediumImpact();
+
+          showModalBottomSheetWithProperFocus(
+            context: context,
+            builder: (context) => UserActionsModal(
+              authStore: context.read<AuthStore>(),
+              name: channelName,
+              userLogin: channelInfo.broadcasterLogin,
+              userId: channelInfo.broadcasterId,
+              showPinOption: showPinOption,
+              isPinned: isPinned,
+            ),
+          );
+        },
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            16 + MediaQuery.of(context).padding.left,
+            8,
+            16 + MediaQuery.of(context).padding.right,
+            8,
+          ),
+          child: Row(
+            spacing: 12,
+            children: [
+              // Profile picture
+              ProfilePicture(userLogin: channelInfo.broadcasterLogin),
+              // Channel info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Channel name
+                    Text(
+                      channelName,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: fontColor,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    // Status and follow duration
+                    Text(
+                      showOfflineStatus ? 'Offline' : followedText,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: fontColor?.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

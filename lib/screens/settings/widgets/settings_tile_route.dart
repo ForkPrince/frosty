@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:frosty/widgets/blurred_container.dart';
+import 'package:frosty/widgets/tv_focus_border.dart';
 
 class SettingsTileRoute extends StatelessWidget {
   final Widget leading;
@@ -18,16 +19,18 @@ class SettingsTileRoute extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: leading,
-      title: Text(title),
-      trailing: const Icon(Icons.chevron_right_rounded),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          settings: RouteSettings(name: title),
-          builder: (context) => useScaffold
-              ? _BlurredSettingsPage(title: title, child: child)
-              : child,
+    return TvFocusBorder(
+      child: ListTile(
+        leading: leading,
+        title: Text(title),
+        trailing: const Icon(Icons.chevron_right_rounded),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            settings: RouteSettings(name: title),
+            builder: (context) => useScaffold
+                ? _BlurredSettingsPage(title: title, child: child)
+                : child,
+          ),
         ),
       ),
     );

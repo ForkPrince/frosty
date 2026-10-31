@@ -697,6 +697,13 @@ abstract class VideoStoreBase with Store implements VideoPlayerInterface {
     }
   }
 
+  @override
+  void keepOverlayVisible() {
+    if (_overlayVisible && !_isInPipMode) {
+      _scheduleOverlayHide();
+    }
+  }
+
   /// Starts the periodic stream info timer for chat-only mode.
   void _startStreamInfoTimer() {
     // Only start if not already active

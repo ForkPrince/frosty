@@ -14,6 +14,7 @@ import 'package:frosty/widgets/frosty_cached_network_image.dart';
 import 'package:frosty/widgets/frosty_photo_view_dialog.dart';
 import 'package:frosty/widgets/profile_picture.dart';
 import 'package:frosty/widgets/skeleton_loader.dart';
+import 'package:frosty/widgets/tv_focus_border.dart';
 import 'package:frosty/widgets/uptime.dart';
 import 'package:frosty/widgets/user_actions_modal.dart';
 import 'package:intl/intl.dart';
@@ -200,49 +201,51 @@ class StreamCard extends StatelessWidget {
       ),
     );
 
-    return InkWell(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          settings: const RouteSettings(name: VideoChat.routeName),
-          builder: (context) => VideoChat(
-            userId: streamInfo.userId,
-            userName: streamInfo.userName,
-            userLogin: streamInfo.userLogin,
+    return TvFocusBorder(
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            settings: const RouteSettings(name: VideoChat.routeName),
+            builder: (context) => VideoChat(
+              userId: streamInfo.userId,
+              userName: streamInfo.userName,
+              userLogin: streamInfo.userLogin,
+            ),
           ),
         ),
-      ),
-      onLongPress: () {
-        HapticFeedback.mediumImpact();
+        onLongPress: () {
+          HapticFeedback.mediumImpact();
 
-        showModalBottomSheetWithProperFocus(
-          context: context,
-          builder: (context) => UserActionsModal(
-            authStore: context.read<AuthStore>(),
-            name: streamerName,
-            userLogin: streamInfo.userLogin,
-            userId: streamInfo.userId,
-            showPinOption: showPinOption,
-            isPinned: isPinned,
+          showModalBottomSheetWithProperFocus(
+            context: context,
+            builder: (context) => UserActionsModal(
+              authStore: context.read<AuthStore>(),
+              name: streamerName,
+              userLogin: streamInfo.userLogin,
+              userId: streamInfo.userId,
+              showPinOption: showPinOption,
+              isPinned: isPinned,
+            ),
+          );
+        },
+        child: Padding(
+          padding: EdgeInsets.only(
+            top: 8,
+            bottom: 8,
+            left: showThumbnail
+                ? 16 + MediaQuery.of(context).padding.left
+                : 4 + MediaQuery.of(context).padding.left,
+            right: showThumbnail
+                ? 16 + MediaQuery.of(context).padding.right
+                : 4 + MediaQuery.of(context).padding.right,
           ),
-        );
-      },
-      child: Padding(
-        padding: EdgeInsets.only(
-          top: 8,
-          bottom: 8,
-          left: showThumbnail
-              ? 16 + MediaQuery.of(context).padding.left
-              : 4 + MediaQuery.of(context).padding.left,
-          right: showThumbnail
-              ? 16 + MediaQuery.of(context).padding.right
-              : 4 + MediaQuery.of(context).padding.right,
-        ),
-        child: Row(
-          children: [
-            if (showThumbnail) Flexible(child: imageSection),
-            Flexible(flex: 2, child: streamInfoSection),
-          ],
+          child: Row(
+            children: [
+              if (showThumbnail) Flexible(child: imageSection),
+              Flexible(flex: 2, child: streamInfoSection),
+            ],
+          ),
         ),
       ),
     );

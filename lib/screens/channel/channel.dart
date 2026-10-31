@@ -16,9 +16,11 @@ import 'package:frosty/screens/channel/video/video_store.dart';
 import 'package:frosty/screens/settings/stores/settings_store.dart';
 import 'package:frosty/theme.dart';
 import 'package:frosty/utils/context_extensions.dart';
+import 'package:frosty/utils/tv.dart';
 import 'package:frosty/widgets/blurred_container.dart';
 import 'package:frosty/widgets/draggable_divider.dart';
 import 'package:frosty/widgets/frosty_notification.dart';
+import 'package:mobx/mobx.dart';
 import 'package:simple_pip_mode/actions/pip_actions_layout.dart';
 import 'package:simple_pip_mode/pip_widget.dart';
 
@@ -45,6 +47,21 @@ class _VideoChatState extends State<VideoChat>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final _videoKey = GlobalKey();
   final _chatKey = GlobalKey();
+  final _tvFocusNode = FocusNode(debugLabel: 'VideoChat TV player');
+
+  static const _tvSelectKeys = {
+    LogicalKeyboardKey.select,
+    LogicalKeyboardKey.enter,
+    LogicalKeyboardKey.numpadEnter,
+    LogicalKeyboardKey.gameButtonA,
+  };
+
+  static const _tvDpadKeys = {
+    LogicalKeyboardKey.arrowUp,
+    LogicalKeyboardKey.arrowDown,
+    LogicalKeyboardKey.arrowLeft,
+    LogicalKeyboardKey.arrowRight,
+  };
 
   // PiP drag state — ValueNotifier avoids full widget rebuilds during drag.
   final _pipDragDistance = ValueNotifier<double>(0);
@@ -63,6 +80,8 @@ class _VideoChatState extends State<VideoChat>
   late Animation<double> _springBackAnimation;
 
   bool? _isImmersiveSystemUiEnabled;
+
+  late final ReactionDisposer _overlayFocusReaction;
 
   late final ChatTabsStore _chatTabsStore = ChatTabsStore(
     twitchApi: context.twitchApi,
@@ -119,6 +138,55 @@ class _VideoChatState extends State<VideoChat>
 
     // Register as observer for app lifecycle events
     WidgetsBinding.instance.addObserver(this);
+
+    // When the TV overlay auto-hides, pull focus back to the player so the
+    // remote can't activate an invisible control.
+    _overlayFocusReaction = reaction(
+      (_) => _videoStore.overlayVisible,
+      (visible) {
+        if (isTv &&
+            !visible &&
+            !_videoStore.paused &&
+            mounted &&
+            (ModalRoute.of(context)?.isCurrent ?? false)) {
+          _tvFocusNode.requestFocus();
+        }
+      },
+    );
+  }
+
+  KeyEventResult _handleTvKey(FocusNode node, KeyEvent event) {
+    if (!isTv || event is! KeyDownEvent) return KeyEventResult.ignored;
+
+    final key = event.logicalKey;
+
+    // Keep the TV controls on screen while the remote is being used.
+    if (_videoStore.overlayVisible) {
+      _videoStore.keepOverlayVisible();
+    }
+
+    if (key == LogicalKeyboardKey.mediaPlayPause ||
+        key == LogicalKeyboardKey.mediaPlay ||
+        key == LogicalKeyboardKey.mediaPause) {
+      _videoStore.handlePausePlay();
+      return KeyEventResult.handled;
+    }
+
+    if (!_tvFocusNode.hasPrimaryFocus) return KeyEventResult.ignored;
+
+    if (_tvSelectKeys.contains(key)) {
+      _videoStore.handleVideoTap();
+      return KeyEventResult.handled;
+    }
+
+    // With the overlay hidden, any D-pad direction reveals the controls. The
+    // next press then moves focus through them normally.
+    if (!_videoStore.overlayVisible && _tvDpadKeys.contains(key)) {
+      _videoStore.handleVideoTap();
+      return KeyEventResult.handled;
+    }
+
+    return KeyEventResult.ignored;
   }
 
   @override
@@ -769,6 +837,15 @@ class _VideoChatState extends State<VideoChat>
       },
     );
 
+    final focusableVideoChat = Focus(
+      focusNode: _tvFocusNode,
+      autofocus: isTv,
+      canRequestFocus: isTv,
+      skipTraversal: !isTv,
+      onKeyEvent: _handleTvKey,
+      child: videoChat,
+    );
+
     // If on Android, use PiPSwitcher to enable PiP functionality.
     if (Platform.isAndroid) {
       // Both players need this — the WebView store used to be skipped by a
@@ -782,17 +859,20 @@ class _VideoChatState extends State<VideoChat>
         onPipEntered: () => notifyPip(true),
         onPipExited: () => notifyPip(false),
         pipChild: player,
-        child: videoChat,
+        child: focusableVideoChat,
       );
     }
 
-    return videoChat;
+    return focusableVideoChat;
   }
 
   @override
   void dispose() {
     // Remove observer for app lifecycle events
     WidgetsBinding.instance.removeObserver(this);
+
+    _overlayFocusReaction.dispose();
+    _tvFocusNode.dispose();
 
     _chatTabsStore.dispose();
 
