@@ -10,6 +10,15 @@ import 'package:frosty/widgets/section_header.dart';
 import 'package:frosty/widgets/settings_page_layout.dart';
 
 /// Preset ad-blocking proxy servers (ported from Twire).
+///
+/// The `https://...` entries are TTVLOL **v1** playlist proxies: Frosty
+/// rewrites the stream URL to `<proxy>/playlist/<channel>.m3u8`.
+///
+/// The `v2:...` entries are TTVLOL **v2** forward proxies, a different
+/// protocol: `host:port` of a plain HTTP CONNECT proxy (see
+/// `StreamProxyConfig`). Do not put a v2 address in the v1 Custom field
+/// (or vice versa) — a v2 host returns a Squid 400 for playlist URLs, and
+/// a v1 URL is not a valid forward-proxy address.
 const _streamProxies = <String, String>{
   'Disabled': '',
   'EU': 'https://lb-eu.cdn-perfprod.com',
@@ -24,6 +33,8 @@ const _streamProxies = <String, String>{
   'EU 2 (Luminous)': 'https://eu2.luminous.dev',
   'Asia (Luminous)': 'https://as.luminous.dev',
   'Custom': 'custom',
+  'Nadeko (TTVLOLv2)': 'v2:twitch-al.nadeko.net:2023',
+  'Custom (TTVLOLv2)': 'v2:',
 };
 
 /// Ad-blocking scripts for the WebView player (ported from Samtch, which
@@ -83,7 +94,8 @@ class VideoSettings extends StatelessWidget {
               ListTile(
                 title: const Text('Stream proxy'),
                 subtitle: const Text(
-                  'Routes streams through a proxy to block ads. Only works with the native player.',
+                  'Routes streams through a proxy to block ads. Only works with the native player. '
+                  'TTVLOLv2 entries are forward proxies (host:port); only playlist requests go through them.',
                 ),
                 trailing: DropdownButton<String>(
                   value: _getSelectedProxyLabel(settingsStore.streamProxy),
@@ -103,6 +115,8 @@ class VideoSettings extends StatelessWidget {
               ),
               if (settingsStore.streamProxy == 'custom')
                 _CustomProxyField(settingsStore: settingsStore),
+              if (_isCustomV2Proxy(settingsStore.streamProxy))
+                _CustomV2ProxyField(settingsStore: settingsStore),
             ] else
               ListTile(
                 title: const Text('Ad-blocking script'),
@@ -202,12 +216,74 @@ class _CustomProxyFieldState extends State<_CustomProxyField> {
   }
 }
 
+/// True for a v2 value that is not a known preset, i.e. the
+/// "Custom (TTVLOLv2)" choice (including the empty `v2:` value the
+/// dropdown writes before the user has typed anything).
+bool _isCustomV2Proxy(String proxyValue) {
+  if (!proxyValue.startsWith('v2:')) return false;
+  return !_streamProxies.values.contains(proxyValue);
+}
+
+class _CustomV2ProxyField extends StatefulWidget {
+  final SettingsStore settingsStore;
+
+  const _CustomV2ProxyField({required this.settingsStore});
+
+  @override
+  State<_CustomV2ProxyField> createState() => _CustomV2ProxyFieldState();
+}
+
+class _CustomV2ProxyFieldState extends State<_CustomV2ProxyField> {
+  late final _controller = TextEditingController(
+    text: widget.settingsStore.streamProxy.substring('v2:'.length),
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _controller,
+            autocorrect: false,
+            enableSuggestions: false,
+            keyboardType: TextInputType.url,
+            decoration: const InputDecoration(
+              hintText: 'twitch-al.nadeko.net:2023',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            // The host:port is stored straight in the `v2:` value, so
+            // no second custom field is needed (see StreamProxyConfig).
+            onChanged: (value) =>
+                widget.settingsStore.streamProxy = 'v2:${value.trim()}',
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'A forward proxy host and port — not a playlist URL. '
+            'Only playlist requests go through it; video loads direct.',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 String _getSelectedProxyLabel(String proxyValue) {
   if (proxyValue.isEmpty) return 'Disabled';
   if (proxyValue == 'custom') return 'Custom';
   for (final entry in _streamProxies.entries) {
     if (entry.value == proxyValue) return entry.key;
   }
+  if (proxyValue.startsWith('v2:')) return 'Custom (TTVLOLv2)';
   return 'Custom';
 }
 

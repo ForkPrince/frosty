@@ -4,6 +4,16 @@
 	<dict>
 		<key>ITSAppUsesNonExemptEncryption</key>
 		<false/>
+		<key>NSAppTransportSecurity</key>
+		<dict>
+			<!-- TTVLOLv2 only: the in-app loopback playlist proxy serves HLS
+				 playlists from http://127.0.0.1 (see TtvLolV2LocalProxy).
+				 NSAllowsLocalNetworking permits cleartext only to local
+				 addresses; it is not NSAllowsArbitraryLoads, so all other
+				 traffic keeps the default ATS policy. -->
+			<key>NSAllowsLocalNetworking</key>
+			<true/>
+		</dict>
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
 		<key>CFBundleDisplayName</key>

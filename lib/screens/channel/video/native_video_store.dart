@@ -15,6 +15,8 @@ import 'package:frosty/models/stream.dart';
 import 'package:frosty/screens/channel/video/chat_latency_sync.dart';
 import 'package:frosty/screens/channel/video/native_video_player_interface.dart';
 import 'package:frosty/screens/channel/video/stream_info_poller.dart';
+import 'package:frosty/screens/channel/video/stream_proxy_config.dart';
+import 'package:frosty/screens/channel/video/ttvlol_v2_local_proxy.dart';
 import 'package:frosty/screens/channel/video/video_timing_constants.dart';
 import 'package:frosty/screens/settings/stores/auth_store.dart';
 import 'package:frosty/screens/settings/stores/settings_store.dart';
@@ -107,6 +109,13 @@ abstract class NativeVideoStoreBase
   StreamSubscription<bool>? _pipSub;
   StreamSubscription<List<NativeVideoPlayerQuality>>? _qualitiesSub;
   StreamSubscription<bool>? _adBreakSub;
+
+  /// Loopback server for a TTVLOLv2 proxy, if one is selected. Kept alive
+  /// across light refreshes (the player polls it for live playlist
+  /// updates) and torn down with the controller on hard refreshes /
+  /// chat-only mode / dispose. Plain field, not a MobX observable: the
+  /// player never renders from it, so no generated code is involved.
+  TtvLolV2LocalProxy? _v2Proxy;
 
   /// True while a server-stitched ad break is playing (native player detects
   /// twitch-stitched-ad dateranges). Latency readings and play/buffer
@@ -419,17 +428,38 @@ abstract class NativeVideoStoreBase
     }
     runInAction(() => _restrictedStreamQualities = token.restrictedQualities);
 
-    // Resolve the stream proxy: use the custom URL if a custom proxy is
-    // selected, otherwise use the preset value directly.
-    final proxy = settingsStore.streamProxy == 'custom'
-        ? settingsStore.customStreamProxy
-        : settingsStore.streamProxy;
-
-    final hlsUrl = twitchGqlApi.buildHlsUrl(
-      login: userLogin,
-      token: token,
-      proxy: proxy,
+    // Resolve the stream proxy (see StreamProxyConfig for the encoding).
+    // v1 keeps its old behaviour: the URL itself is rewritten to the
+    // proxy. v2 must NOT be rewritten that way — a v2 address is a
+    // forward proxy, not a playlist service — so the normal Usher URL is
+    // kept and handed to the player via the loopback proxy instead. The
+    // player, headers, and quality handling are unchanged either way.
+    final proxyConfig = StreamProxyConfig.parse(
+      streamProxy: settingsStore.streamProxy,
+      customStreamProxy: settingsStore.customStreamProxy,
     );
+
+    final String hlsUrl;
+    if (proxyConfig.isV2) {
+      if (_v2Proxy?.v2Endpoint != proxyConfig.endpoint) {
+        await _v2Proxy?.stop();
+        _v2Proxy = TtvLolV2LocalProxy(v2Endpoint: proxyConfig.endpoint);
+      }
+      final usherUrl = twitchGqlApi.buildHlsUrl(
+        login: userLogin,
+        token: token,
+      );
+      hlsUrl = (await _v2Proxy!.urlFor(usherUrl)).toString();
+    } else {
+      // v1 or disabled: a stale v2 server (user switched proxy type
+      // mid-session) must not keep running.
+      _stopV2Proxy();
+      hlsUrl = twitchGqlApi.buildHlsUrl(
+        login: userLogin,
+        token: token,
+        proxy: proxyConfig.isV1 ? proxyConfig.endpoint : null,
+      );
+    }
 
     await _controller!.loadUrl(
       url: hlsUrl,
@@ -1276,11 +1306,21 @@ abstract class NativeVideoStoreBase
     _disposeController();
   }
 
+  /// Stops the TTVLOLv2 loopback server, if any. Fire-and-forget: the
+  /// server binds an ephemeral loopback port, so a new server (if the next
+  /// load still uses v2) never conflicts with the closing one.
+  void _stopV2Proxy() {
+    final proxy = _v2Proxy;
+    _v2Proxy = null;
+    if (proxy != null) unawaited(proxy.stop());
+  }
+
   /// Tears down the native player and all of its observers. Releases the
   /// `AVPlayer`, deactivates the audio session (when this is the last player
   /// alive), and stops the PiP controller. Safe to call when no controller
   /// has been created.
   void _disposeController() {
+    _stopV2Proxy();
     _latencyTimer?.cancel();
     _stallRecoveryTimer?.cancel();
     _initRetryTimer?.cancel();

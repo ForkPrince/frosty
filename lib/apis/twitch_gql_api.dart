@@ -94,9 +94,12 @@ class TwitchGqlApi extends BaseApiClient {
 
   /// Builds the HLS stream URL for the given channel [login] and [token].
   ///
-  /// When [proxy] is non-empty, the URL is rewritten to route through the
-  /// ad-blocking proxy server instead of fetching directly from Twitch's
-  /// Usher API. The proxy strips ad segments from the M3U8 playlist.
+  /// When [proxy] is non-empty, the URL is rewritten to route through a
+  /// TTVLOL **v1** ad-blocking proxy server instead of fetching directly
+  /// from Twitch's Usher API. The proxy strips ad segments from the M3U8
+  /// playlist. This parameter is for v1 only: a v2 forward proxy
+  /// (`host:port`) must not be passed here -- it is handled by the
+  /// TTVLOLv2 loopback proxy via the un-rewritten Usher URL instead.
   String buildHlsUrl({
     required String login,
     required PlaybackAccessToken token,
