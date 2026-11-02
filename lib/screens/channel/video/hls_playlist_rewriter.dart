@@ -1,52 +1,40 @@
+import 'dart:convert';
+
 /// Rewrites an HLS playlist fetched through the TTVLOLv2 local proxy.
 ///
 /// The native player (ExoPlayer / AVPlayer) is given a loopback URL, so it
 /// resolves every *relative* URL in a playlist against that loopback URL.
 /// That would send video segments — which must go direct to Twitch, see
-/// [TtvLolV2LocalProxy] — back to the local server, and would send nested
+/// `TtvLolV2LocalProxy` — back to the local server, and would send nested
 /// playlists direct to Twitch, defeating the proxy. So before a playlist is
 /// handed to the player:
 ///
 /// * every `.m3u8` URL (master variants, nested/media playlists, and
-///   `URI="..."` attributes such as `EXT-X-I-FRAME-STREAM-INF`) is
-///   rewritten through [toLocalPlaylistUrl], so the player fetches it from
-///   the loopback server, which re-fetches it via the v2 proxy;
-/// * every other URL (segments, `EXT-X-MAP` init segments, `EXT-X-KEY`
-///   URIs) is absolutised against the playlist's upstream URL and left
-///   untouched otherwise, so the player fetches it direct from Twitch.
-///   That includes `#EXT-X-TWITCH-PREFETCH:` values: they are neither a
-///   URI line nor a `URI="..."` attribute, but the native player's
-///   low-latency parser promotes them to segments, so a relative one
-///   would otherwise resolve against the loopback URL and 400.
+///   `URI="..."` attributes such as `EXT-X-I-FRAME-STREAM-INF`) is rewritten
+///   through [toLocalPlaylistUrl], so the player fetches it from the loopback
+///   server, which re-fetches it via the v2 proxy;
+/// * every other URL (segments, `EXT-X-MAP` init segments, `EXT-X-KEY` URIs,
+///   and `EXT-X-TWITCH-PREFETCH` values, which the player's low-latency
+///   parser promotes to segments) is absolutised against the playlist's
+///   upstream URL and left to load direct from Twitch.
 ///
-/// The function is pure (no I/O) and operates line by line, which is all
-/// HLS needs: a playlist is a sequence of `#tag` lines and URI lines.
-
-/// Rewrites [playlist] (fetched from [upstreamUrl]) as described above.
-/// [toLocalPlaylistUrl] maps an absolute upstream playlist URL to the
-/// loopback URL the player should fetch instead.
+/// The function is pure (no I/O) and operates line by line, which is all HLS
+/// needs: a playlist is a sequence of `#tag` lines and URI lines.
 String rewriteHlsPlaylist({
   required String playlist,
   required Uri upstreamUrl,
   required Uri Function(Uri upstreamPlaylistUrl) toLocalPlaylistUrl,
 }) {
-  final buffer = StringBuffer();
-  // Split on \n and keep the original line endings out of the output;
-  // HLS parsers accept \n, and the upstream playlists use it already.
-  final lines = playlist.split('\n');
-  for (var i = 0; i < lines.length; i++) {
-    var line = lines[i];
-    // Tolerate \r\n input without leaking \r into rewritten URLs.
-    if (line.endsWith('\r')) line = line.substring(0, line.length - 1);
-    buffer.writeln(_rewriteLine(line, upstreamUrl, toLocalPlaylistUrl));
-  }
-  var result = buffer.toString();
-  // Preserve the input's trailing-newline shape: split/join above always
-  // appends one, so drop it when the input did not end with a newline.
-  if (!playlist.endsWith('\n') && result.endsWith('\n')) {
-    result = result.substring(0, result.length - 1);
-  }
-  return result;
+  // LineSplitter handles \n, \r\n, and \r and drops the trailing terminator,
+  // so re-add one (normalised to \n) when the input had one.
+  final lines = const LineSplitter().convert(playlist);
+  final rewritten = [
+    for (final line in lines)
+      _rewriteLine(line, upstreamUrl, toLocalPlaylistUrl),
+  ].join('\n');
+  return playlist.endsWith('\n') || playlist.endsWith('\r')
+      ? '$rewritten\n'
+      : rewritten;
 }
 
 String _rewriteLine(
@@ -74,39 +62,38 @@ String _rewriteUriLine(
   return resolved.toString();
 }
 
-/// Rewrites a `URI="..."` attribute inside a tag line, if present.
+/// Rewrites a `URI="..."` attribute or a prefetch value inside a tag line.
 String _rewriteTagLine(
   String line,
   Uri upstreamUrl,
   Uri Function(Uri) toLocalPlaylistUrl,
 ) {
-  // #EXT-X-TWITCH-PREFETCH:<url> carries its URL as the tag value, not
-  // as a URI line or URI attribute. Absolutise it (it is a segment, so
-  // it must stay direct, never go through the local proxy).
-  const prefetchPrefix = '#EXT-X-TWITCH-PREFETCH:';
-  if (line.startsWith(prefetchPrefix)) {
-    final raw = line.substring(prefetchPrefix.length).trim();
-    final resolved = _resolve(upstreamUrl, raw);
+  // #EXT-X-TWITCH-PREFETCH:<url> carries its URL as the tag value, not as a
+  // URI line or URI attribute. It is a segment, so it must stay direct.
+  if (line.startsWith(_prefetchPrefix)) {
+    final resolved = _resolve(
+      upstreamUrl,
+      line.substring(_prefetchPrefix.length).trim(),
+    );
     if (resolved == null) return line;
-    return '$prefetchPrefix$resolved';
+    return '$_prefetchPrefix$resolved';
   }
+
   final match = _uriAttribute.firstMatch(line);
   if (match == null) return line;
-  final raw = match.group(1)!;
-  final resolved = _resolve(upstreamUrl, raw);
+  final resolved = _resolve(upstreamUrl, match.group(1)!);
   if (resolved == null) return line;
   final replacement = _isPlaylistUrl(resolved)
       ? toLocalPlaylistUrl(resolved).toString()
       : resolved.toString();
-  return line.replaceRange(match.start + 5, match.end - 1, replacement);
+  return line.replaceRange(match.start, match.end, 'URI="$replacement"');
 }
 
-/// Matches `URI="..."` — the `5`/`-1` offsets in [_rewriteTagLine] are the
-/// length of `URI="` and the closing quote.
+const _prefetchPrefix = '#EXT-X-TWITCH-PREFETCH:';
+
 final _uriAttribute = RegExp(r'URI="([^"]*)"');
 
-bool _isPlaylistUrl(Uri url) =>
-    url.path.toLowerCase().endsWith('.m3u8');
+bool _isPlaylistUrl(Uri url) => url.path.toLowerCase().endsWith('.m3u8');
 
 Uri? _resolve(Uri base, String raw) {
   if (raw.isEmpty) return null;

@@ -40,11 +40,11 @@ void main() {
 
     test('v2 preset is a forward proxy, not a URL', () {
       final config = StreamProxyConfig.parse(
-        streamProxy: 'v2:twitch-al.nadeko.net:2023',
+        streamProxy: 'v2:proxy.example.com:2023',
         customStreamProxy: '',
       );
       expect(config.isV2, isTrue);
-      expect(config.endpoint, 'twitch-al.nadeko.net:2023');
+      expect(config.endpoint, 'proxy.example.com:2023');
     });
 
     test('v2 custom value is parsed from the v2: value itself', () {
@@ -60,11 +60,11 @@ void main() {
     test('malformed v2 values degrade to disabled, never crash', () {
       for (final bad in [
         'v2:',
-        'v2:twitch-al.nadeko.net',
-        'v2:twitch-al.nadeko.net:notaport',
-        'v2:twitch-al.nadeko.net:0',
-        'v2:twitch-al.nadeko.net:65536',
-        'v2:user@twitch-al.nadeko.net:2023',
+        'v2:proxy.example.com',
+        'v2:proxy.example.com:notaport',
+        'v2:proxy.example.com:0',
+        'v2:proxy.example.com:65536',
+        'v2:user@proxy.example.com:2023',
       ]) {
         final config = StreamProxyConfig.parse(
           streamProxy: bad,
@@ -82,24 +82,24 @@ void main() {
   group('StreamProxyConfig.parseV2Endpoint', () {
     test('accepts bare host:port and strips schemes and paths', () {
       expect(
-        StreamProxyConfig.parseV2Endpoint('twitch-al.nadeko.net:2023'),
-        'twitch-al.nadeko.net:2023',
+        StreamProxyConfig.parseV2Endpoint('proxy.example.com:2023'),
+        'proxy.example.com:2023',
       );
       expect(
-        StreamProxyConfig.parseV2Endpoint('http://twitch-al.nadeko.net:2023'),
-        'twitch-al.nadeko.net:2023',
-      );
-      expect(
-        StreamProxyConfig.parseV2Endpoint(
-          'httpproxy://twitch-al.nadeko.net:2023',
-        ),
-        'twitch-al.nadeko.net:2023',
+        StreamProxyConfig.parseV2Endpoint('http://proxy.example.com:2023'),
+        'proxy.example.com:2023',
       );
       expect(
         StreamProxyConfig.parseV2Endpoint(
-          'https://twitch-al.nadeko.net:2023/',
+          'httpproxy://proxy.example.com:2023',
         ),
-        'twitch-al.nadeko.net:2023',
+        'proxy.example.com:2023',
+      );
+      expect(
+        StreamProxyConfig.parseV2Endpoint(
+          'https://proxy.example.com:2023/',
+        ),
+        'proxy.example.com:2023',
       );
     });
 
@@ -117,17 +117,4 @@ void main() {
     });
   });
 
-  group('StreamProxyConfig.splitV2Endpoint', () {
-    test('splits a canonical endpoint', () {
-      expect(
-        StreamProxyConfig.splitV2Endpoint('twitch-al.nadeko.net:2023'),
-        (host: 'twitch-al.nadeko.net', port: 2023),
-      );
-    });
-
-    test('returns null for anything unparseable', () {
-      expect(StreamProxyConfig.splitV2Endpoint('example.com'), isNull);
-      expect(StreamProxyConfig.splitV2Endpoint(''), isNull);
-    });
-  });
 }

@@ -430,10 +430,8 @@ abstract class NativeVideoStoreBase
 
     // Resolve the stream proxy (see StreamProxyConfig for the encoding).
     // v1 keeps its old behaviour: the URL itself is rewritten to the
-    // proxy. v2 must NOT be rewritten that way — a v2 address is a
-    // forward proxy, not a playlist service — so the normal Usher URL is
-    // kept and handed to the player via the loopback proxy instead. The
-    // player, headers, and quality handling are unchanged either way.
+    // proxy. v2 is a forward proxy, not a playlist service, so the plain
+    // Usher URL is loaded through the loopback proxy instead.
     final proxyConfig = StreamProxyConfig.parse(
       streamProxy: settingsStore.streamProxy,
       customStreamProxy: settingsStore.customStreamProxy,
@@ -441,10 +439,6 @@ abstract class NativeVideoStoreBase
 
     final String hlsUrl;
     if (proxyConfig.isV2) {
-      debugPrint(
-        'NativeVideoStore: using TTVLOLv2 proxy ${proxyConfig.endpoint} '
-        'via loopback',
-      );
       if (_v2Proxy?.v2Endpoint != proxyConfig.endpoint) {
         await _v2Proxy?.stop();
         _v2Proxy = TtvLolV2LocalProxy(v2Endpoint: proxyConfig.endpoint);

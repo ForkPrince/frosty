@@ -103,16 +103,4 @@ class StreamProxyConfig {
     if (port == null || port < 1 || port > 65535) return null;
     return '$host:$port';
   }
-
-  /// Splits a canonical `host:port` endpoint (as returned by
-  /// [parseV2Endpoint]) into its parts. Returns `null` for anything else.
-  static ({String host, int port})? splitV2Endpoint(String endpoint) {
-    final parsed = parseV2Endpoint(endpoint);
-    if (parsed == null) return null;
-    final colon = parsed.lastIndexOf(':');
-    return (
-      host: parsed.substring(0, colon),
-      port: int.parse(parsed.substring(colon + 1)),
-    );
-  }
 }

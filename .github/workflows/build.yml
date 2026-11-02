@@ -1,6 +1,3 @@
-# Builds the APK on every branch. On main it updates the "latest"
-# GitHub release; on any other branch it uploads the APK as a workflow
-# artifact instead, so a feature branch can never overwrite the release.
 name: GitHub release
 on:
   workflow_dispatch:
@@ -24,25 +21,21 @@ jobs:
       - name: Checkout Frosty repo
         uses: actions/checkout@v6
 
-      # Setup Java so that we can build the APK.
       - name: Set up Java
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
 
-      # Setup and cache Flutter to install packages and build.
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version-file: pubspec.yaml
           cache: true
 
-      # Decode and create the upload-keystore.jks file, used for signing the app.
       - name: Decode and create upload-keystore.jks
         run: echo $UPLOAD_KEYSTORE | base64 --decode > $GITHUB_WORKSPACE/android/upload-keystore.jks
 
-      # Create the key.properties file, used for signing the app.
       - name: Create key.properties
         run: |
           echo storePassword=$STORE_PASSWORD >> $KEY_FILE_PATH
@@ -50,10 +43,6 @@ jobs:
           echo keyAlias=upload >> $KEY_FILE_PATH
           echo storeFile=$GITHUB_WORKSPACE/android/upload-keystore.jks >> $KEY_FILE_PATH
 
-      # Build the APK with the environment variables and move/rename it.
-      # The branch name is slash-sanitised: on feature/ttvlol-v2 the
-      # unsanitised name would be frosty-feature/ttvlol-v2.apk, and mv
-      # would fail because frosty-feature/ does not exist.
       - name: Build for Android
         run: |
           flutter build apk --dart-define CLIENT_ID=$CLIENT_ID --dart-define SECRET=$SECRET
@@ -62,9 +51,6 @@ jobs:
           echo "APK_FILE=frosty-${safe_branch}.apk" >> "$GITHUB_ENV"
           mv build/app/outputs/flutter-apk/app-release.apk "frosty-${safe_branch}.apk"
 
-      # Create or update a "latest" release on GitHub, main only.
-      # github.ref (not ref_name) is checked so a tag literally named
-      # "main" could not trigger a release.
       - name: Release
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v3
@@ -77,11 +63,6 @@ jobs:
           make_latest: true
           files: ${{ env.APK_FILE }}
 
-      # Any other branch: same APK, uploaded as a workflow artifact
-      # instead of touching the release. The artifact name is kept
-      # simple on purpose: a branch like feature/ttvlol-v2 would be an
-      # invalid artifact name, and the run itself already shows which
-      # branch it came from. The file inside keeps the branch name.
       - name: Upload APK as artifact
         if: github.ref != 'refs/heads/main'
         uses: actions/upload-artifact@v4

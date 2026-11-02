@@ -58,7 +58,7 @@ import 'package:frosty/screens/channel/video/hls_playlist_rewriter.dart';
 /// the existing 4xx auto-refresh still fires.
 class TtvLolV2LocalProxy {
   /// [v2Endpoint] must be a canonical `host:port` address (see
-  /// [StreamProxyConfig.parseV2Endpoint]); all call sites parse first, so
+  /// `StreamProxyConfig.parseV2Endpoint`); all call sites parse first, so
   /// a malformed value here can only degrade to a failed proxy fetch,
   /// which the direct fallback then covers.
   TtvLolV2LocalProxy({required this.v2Endpoint});
@@ -72,16 +72,6 @@ class TtvLolV2LocalProxy {
 
   /// True once a v2 fetch has failed and later fetches go direct.
   bool _directFallbackLatched = false;
-
-  /// HTTP status of the most recent upstream response for the playlist
-  /// currently being fetched (null when the fetch failed before any
-  /// response arrived). Used so a 4xx from Twitch is forwarded to the
-  /// player instead of being masked as a 502: the player's error
-  /// handling auto-refreshes on 4xx (fresh token), which a 502 would not
-  /// trigger.
-  int? _lastUpstreamStatus;
-
-  bool get isRunning => _server != null;
 
   /// The loopback base URL the player is pointed at, e.g.
   /// `http://127.0.0.1:54321`. Starts the server on first call.
@@ -99,7 +89,7 @@ class TtvLolV2LocalProxy {
   /// playlist updates, and every poll re-enters [_handleRequest].
   Future<Uri> urlFor(String upstreamPlaylistUrl) async {
     final base = await baseUrl;
-    return base.replace(path: _localPath(_encodeUpstream(upstreamPlaylistUrl)));
+    return _localUrl(base.port, upstreamPlaylistUrl);
   }
 
   Future<void> _ensureStarted() async {
@@ -152,30 +142,26 @@ class TtvLolV2LocalProxy {
         _respond(request, HttpStatus.badRequest, 'Bad request');
         return;
       }
-      final playlist = await _fetchPlaylist(upstream);
-      // Log host + status only, never the upstream URL: it carries the
-      // playback token in its query string.
-      debugPrint(
-        'TTVLOLv2: ${upstream.host} -> '
-        '${playlist?.statusCode ?? _lastUpstreamStatus} '
-        '(${_directFallbackLatched ? 'direct fallback' : 'via proxy'})',
-      );
-      if (playlist == null) {
+      final fetch = await _fetchPlaylist(upstream);
+      final body = fetch.body;
+      if (body == null) {
+        // Log the host and status only: the upstream URL carries the
+        // playback token in its query string.
+        debugPrint('TTVLOLv2: ${upstream.host} -> ${fetch.statusCode}');
         _respond(
           request,
-          _lastUpstreamStatus ?? HttpStatus.badGateway,
+          fetch.statusCode ?? HttpStatus.badGateway,
           'TTVLOLv2 proxy unavailable and direct fetch failed',
         );
         return;
       }
       final rewritten = rewriteHlsPlaylist(
-        playlist: playlist.body,
+        playlist: body,
         upstreamUrl: upstream,
-        toLocalPlaylistUrl: (Uri upstreamPlaylistUrl) =>
-            _localUrlFor(upstreamPlaylistUrl),
+        toLocalPlaylistUrl: _localUrlFor,
       );
       request.response
-        ..statusCode = playlist.statusCode
+        ..statusCode = fetch.statusCode!
         ..headers.contentType = ContentType(
           'application',
           'vnd.apple.mpegurl',
@@ -221,17 +207,14 @@ class TtvLolV2LocalProxy {
   Uri _localUrlFor(Uri upstreamPlaylistUrl) {
     final server = _server;
     if (server == null) return upstreamPlaylistUrl;
-    return Uri.parse(
-      'http://127.0.0.1:${server.port}${_localPath(_encodeUpstream(upstreamPlaylistUrl.toString()))}',
-    );
+    return _localUrl(server.port, upstreamPlaylistUrl.toString());
   }
 
   /// Fetches [upstream] through the v2 proxy, falling back to a direct
-  /// fetch (latched) on failure. Returns null only when both fail.
-  Future<_Playlist?> _fetchPlaylist(Uri upstream) async {
-    _lastUpstreamStatus = null;
+  /// fetch (latched) on failure. [body] is null only when both fail.
+  Future<_Fetch> _fetchPlaylist(Uri upstream) async {
     final viaProxy = await _fetchOnce(upstream);
-    if (viaProxy != null) return viaProxy;
+    if (viaProxy.body != null) return viaProxy;
 
     if (!_directFallbackLatched) {
       _directFallbackLatched = true;
@@ -240,19 +223,24 @@ class TtvLolV2LocalProxy {
         'for this stream',
       );
     }
-    return _fetchOnce(upstream);
+    final direct = await _fetchOnce(upstream);
+    if (direct.body != null) return direct;
+    // Keep whichever status Twitch returned so the player's 4xx
+    // auto-refresh still fires instead of seeing a blanket 502.
+    return (body: null, statusCode: direct.statusCode ?? viaProxy.statusCode);
   }
 
-  /// One upstream fetch. Returns null on any transport error or non-2xx
-  /// status (the caller decides whether to retry direct).
-  Future<_Playlist?> _fetchOnce(Uri upstream) async {
+  /// One upstream fetch. [body] is null on any transport error or non-2xx
+  /// status (the caller decides whether to retry direct); [statusCode] is
+  /// the upstream response status when there was one.
+  Future<_Fetch> _fetchOnce(Uri upstream) async {
     final client = _client;
-    if (client == null) return null;
+    if (client == null) return (body: null, statusCode: null);
     HttpClientRequest httpRequest;
     try {
       httpRequest = await client.getUrl(upstream);
     } catch (_) {
-      return null;
+      return (body: null, statusCode: null);
     }
     for (final entry in TwitchGqlApi.playbackHttpHeaders.entries) {
       httpRequest.headers.set(entry.key, entry.value);
@@ -263,9 +251,8 @@ class TtvLolV2LocalProxy {
           .close()
           .timeout(const Duration(seconds: 15));
     } catch (_) {
-      return null;
+      return (body: null, statusCode: null);
     }
-    _lastUpstreamStatus = response.statusCode;
     if (response.statusCode < 200 || response.statusCode >= 300) {
       // Drain so the connection can be reused, then report failure.
       try {
@@ -273,7 +260,7 @@ class TtvLolV2LocalProxy {
       } catch (_) {
         // The connection is already gone; failure is reported below.
       }
-      return null;
+      return (body: null, statusCode: response.statusCode);
     }
     try {
       final body = await response
@@ -282,7 +269,7 @@ class TtvLolV2LocalProxy {
           .timeout(const Duration(seconds: 15));
       return (body: body, statusCode: response.statusCode);
     } catch (_) {
-      return null;
+      return (body: null, statusCode: response.statusCode);
     }
   }
 
@@ -307,7 +294,12 @@ class TtvLolV2LocalProxy {
   }
 }
 
-typedef _Playlist = ({String body, int statusCode});
+typedef _Fetch = ({String? body, int? statusCode});
+
+/// The loopback URL the player loads for [upstreamUrl].
+Uri _localUrl(int port, String upstreamUrl) => Uri.parse(
+      'http://127.0.0.1:$port${_localPath(_encodeUpstream(upstreamUrl))}',
+    );
 
 /// Loopback path for an encoded upstream URL. The `.m3u8` suffix makes
 /// the native player treat the URL as HLS (see the class doc comment).

@@ -11,7 +11,7 @@ void main() {
   group('TtvLolV2LocalProxy.urlFor', () {
     test('loopback URL contains .m3u8 so the player treats it as HLS', () async {
       final proxy = TtvLolV2LocalProxy(
-        v2Endpoint: 'twitch-al.nadeko.net:2023',
+        v2Endpoint: 'proxy.example.com:2023',
       );
       try {
         final url = await proxy.urlFor(
@@ -29,7 +29,7 @@ void main() {
 
     test('different upstream URLs give different loopback URLs', () async {
       final proxy = TtvLolV2LocalProxy(
-        v2Endpoint: 'twitch-al.nadeko.net:2023',
+        v2Endpoint: 'proxy.example.com:2023',
       );
       try {
         final first = await proxy.urlFor(
