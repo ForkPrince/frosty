@@ -14,6 +14,10 @@
 /// * every other URL (segments, `EXT-X-MAP` init segments, `EXT-X-KEY`
 ///   URIs) is absolutised against the playlist's upstream URL and left
 ///   untouched otherwise, so the player fetches it direct from Twitch.
+///   That includes `#EXT-X-TWITCH-PREFETCH:` values: they are neither a
+///   URI line nor a `URI="..."` attribute, but the native player's
+///   low-latency parser promotes them to segments, so a relative one
+///   would otherwise resolve against the loopback URL and 400.
 ///
 /// The function is pure (no I/O) and operates line by line, which is all
 /// HLS needs: a playlist is a sequence of `#tag` lines and URI lines.
@@ -76,6 +80,16 @@ String _rewriteTagLine(
   Uri upstreamUrl,
   Uri Function(Uri) toLocalPlaylistUrl,
 ) {
+  // #EXT-X-TWITCH-PREFETCH:<url> carries its URL as the tag value, not
+  // as a URI line or URI attribute. Absolutise it (it is a segment, so
+  // it must stay direct, never go through the local proxy).
+  const prefetchPrefix = '#EXT-X-TWITCH-PREFETCH:';
+  if (line.startsWith(prefetchPrefix)) {
+    final raw = line.substring(prefetchPrefix.length).trim();
+    final resolved = _resolve(upstreamUrl, raw);
+    if (resolved == null) return line;
+    return '$prefetchPrefix$resolved';
+  }
   final match = _uriAttribute.firstMatch(line);
   if (match == null) return line;
   final raw = match.group(1)!;

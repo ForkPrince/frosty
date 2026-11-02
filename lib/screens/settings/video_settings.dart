@@ -32,6 +32,10 @@ const _streamProxies = <String, String>{
   'EU (Luminous)': 'https://eu.luminous.dev',
   'EU 2 (Luminous)': 'https://eu2.luminous.dev',
   'Asia (Luminous)': 'https://as.luminous.dev',
+  // Nadeko v1: stored without the trailing slash from the announced URL
+  // (https://twitch-al.nadeko.net/), because buildHlsUrl appends
+  // '/playlist/...' itself and a double slash would result otherwise.
+  'Nadeko (TTVLOLv1)': 'https://twitch-al.nadeko.net',
   'Custom': 'custom',
   'Nadeko (TTVLOLv2)': 'v2:twitch-al.nadeko.net:2023',
   'Custom (TTVLOLv2)': 'v2:',
@@ -219,9 +223,17 @@ class _CustomProxyFieldState extends State<_CustomProxyField> {
 /// True for a v2 value that is not a known preset, i.e. the
 /// "Custom (TTVLOLv2)" choice (including the empty `v2:` value the
 /// dropdown writes before the user has typed anything).
+///
+/// Bug history: a plain `_streamProxies.values.contains(proxyValue)` check
+/// is wrong here, because `v2:` itself *is* a value in that map (the
+/// Custom entry). That hid the text field exactly when Custom was first
+/// selected, leaving the user with no way to type a host:port. So the
+/// Custom entry itself is excluded from the preset match.
 bool _isCustomV2Proxy(String proxyValue) {
   if (!proxyValue.startsWith('v2:')) return false;
-  return !_streamProxies.values.contains(proxyValue);
+  return !_streamProxies.entries.any(
+    (entry) => entry.key != 'Custom (TTVLOLv2)' && entry.value == proxyValue,
+  );
 }
 
 class _CustomV2ProxyField extends StatefulWidget {

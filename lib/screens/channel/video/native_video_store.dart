@@ -441,6 +441,10 @@ abstract class NativeVideoStoreBase
 
     final String hlsUrl;
     if (proxyConfig.isV2) {
+      debugPrint(
+        'NativeVideoStore: using TTVLOLv2 proxy ${proxyConfig.endpoint} '
+        'via loopback',
+      );
       if (_v2Proxy?.v2Endpoint != proxyConfig.endpoint) {
         await _v2Proxy?.stop();
         _v2Proxy = TtvLolV2LocalProxy(v2Endpoint: proxyConfig.endpoint);

@@ -18,11 +18,18 @@ import 'package:frosty/screens/channel/video/hls_playlist_rewriter.dart';
 /// loopback HTTP server inside the app:
 ///
 /// ```
-/// ExoPlayer/AVPlayer ──► http://127.0.0.1:<port>/p/<upstream>
+/// ExoPlayer/AVPlayer ──► http://127.0.0.1:<port>/p/<upstream>.m3u8
 ///                        (master + media playlists only)
 ///   local server ──CONNECT──► v2 proxy ──► usher.ttvnw.net / video-weaver.*
 ///   player ──direct──► Twitch CDN (video segments, keys, init segments)
 /// ```
+///
+/// The `.m3u8` suffix on the loopback URL is load-bearing, not cosmetic:
+/// the native player's `isHlsUrl` check treats a URL as HLS only when it
+/// contains `.m3u8` (or `/hls/`). A bare `/p/<base64>` URL was therefore
+/// loaded as a progressive (MP4) source and never played at all — the
+/// reason v2 playback failed outright while v1 (whose rewritten URL still
+/// contains `.m3u8`) worked. The suffix is stripped again on decode.
 ///
 /// Segments stay direct on purpose: the public v2 proxies do not forward
 /// segment hosts (a direct probe of nadeko's Squid gets a connection
@@ -92,7 +99,7 @@ class TtvLolV2LocalProxy {
   /// playlist updates, and every poll re-enters [_handleRequest].
   Future<Uri> urlFor(String upstreamPlaylistUrl) async {
     final base = await baseUrl;
-    return base.replace(path: '/p/${_encodeUpstream(upstreamPlaylistUrl)}');
+    return base.replace(path: _localPath(_encodeUpstream(upstreamPlaylistUrl)));
   }
 
   Future<void> _ensureStarted() async {
@@ -141,10 +148,18 @@ class TtvLolV2LocalProxy {
       }
       final upstream = _upstreamFromRequest(request.uri);
       if (upstream == null) {
+        debugPrint('TTVLOLv2: bad loopback request');
         _respond(request, HttpStatus.badRequest, 'Bad request');
         return;
       }
       final playlist = await _fetchPlaylist(upstream);
+      // Log host + status only, never the upstream URL: it carries the
+      // playback token in its query string.
+      debugPrint(
+        'TTVLOLv2: ${upstream.host} -> '
+        '${playlist?.statusCode ?? _lastUpstreamStatus} '
+        '(${_directFallbackLatched ? 'direct fallback' : 'via proxy'})',
+      );
       if (playlist == null) {
         _respond(
           request,
@@ -179,14 +194,19 @@ class TtvLolV2LocalProxy {
     }
   }
 
-  /// Decodes the upstream playlist URL from a `/p/<base64url>` path.
+  /// Decodes the upstream playlist URL from a `/p/<base64url>.m3u8` path.
+  /// The suffix-less form is also accepted, for robustness.
   /// Returns null for anything else (probes, favicons, stale URLs).
   Uri? _upstreamFromRequest(Uri uri) {
     final segments = uri.pathSegments;
     if (segments.length != 2 || segments[0] != 'p') return null;
+    var encoded = segments[1];
+    if (encoded.endsWith('.m3u8')) {
+      encoded = encoded.substring(0, encoded.length - '.m3u8'.length);
+    }
     try {
       final decoded = utf8.decode(
-        base64Url.decode(_addBase64Padding(segments[1])),
+        base64Url.decode(_addBase64Padding(encoded)),
       );
       final parsed = Uri.parse(decoded);
       if (!parsed.isAbsolute || parsed.scheme != 'https') return null;
@@ -202,7 +222,7 @@ class TtvLolV2LocalProxy {
     final server = _server;
     if (server == null) return upstreamPlaylistUrl;
     return Uri.parse(
-      'http://127.0.0.1:${server.port}/p/${_encodeUpstream(upstreamPlaylistUrl.toString())}',
+      'http://127.0.0.1:${server.port}${_localPath(_encodeUpstream(upstreamPlaylistUrl.toString()))}',
     );
   }
 
@@ -288,6 +308,10 @@ class TtvLolV2LocalProxy {
 }
 
 typedef _Playlist = ({String body, int statusCode});
+
+/// Loopback path for an encoded upstream URL. The `.m3u8` suffix makes
+/// the native player treat the URL as HLS (see the class doc comment).
+String _localPath(String encodedUpstream) => '/p/$encodedUpstream.m3u8';
 
 /// Base64url-encodes an upstream URL for the loopback path, with padding
 /// stripped: `=` at the end of a path segment is legal but some players

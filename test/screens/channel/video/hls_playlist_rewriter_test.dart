@@ -106,6 +106,53 @@ void main() {
     });
   });
 
+  group('rewriteHlsPlaylist prefetch', () {
+    test('absolutises a relative prefetch URL so it stays direct', () {
+      const media = '#EXTM3U\n'
+          '#EXTINF:2.0,\n'
+          'segment-1.ts\n'
+          '#EXT-X-TWITCH-PREFETCH:segment-2.ts\n';
+
+      final rewritten = rewriteHlsPlaylist(
+        playlist: media,
+        upstreamUrl: Uri.parse(
+          'https://video-weaver.fra02.hls.ttvnw.net/v1/playlist/abc/chunked/index.m3u8',
+        ),
+        toLocalPlaylistUrl: _toLocal,
+      );
+
+      // The native low-latency parser promotes prefetch lines to
+      // segments. A relative value left untouched would resolve against
+      // the loopback playlist URL and 400 on the local server.
+      expect(
+        rewritten,
+        '#EXTM3U\n'
+        '#EXTINF:2.0,\n'
+        'https://video-weaver.fra02.hls.ttvnw.net/v1/playlist/abc/chunked/segment-1.ts\n'
+        '#EXT-X-TWITCH-PREFETCH:https://video-weaver.fra02.hls.ttvnw.net/v1/playlist/abc/chunked/segment-2.ts\n',
+      );
+    });
+
+    test('leaves an absolute prefetch URL untouched', () {
+      const media = '#EXTM3U\n'
+          '#EXT-X-TWITCH-PREFETCH:https://video-edge-abc.ttvnw.net/segment-9.ts\n';
+
+      final rewritten = rewriteHlsPlaylist(
+        playlist: media,
+        upstreamUrl: Uri.parse(
+          'https://video-weaver.fra02.hls.ttvnw.net/v1/playlist/abc/index.m3u8',
+        ),
+        toLocalPlaylistUrl: _toLocal,
+      );
+
+      expect(
+        rewritten,
+        '#EXTM3U\n'
+        '#EXT-X-TWITCH-PREFETCH:https://video-edge-abc.ttvnw.net/segment-9.ts\n',
+      );
+    });
+  });
+
   test('preserves a missing trailing newline', () {
     const playlist = '#EXTM3U\nsegment.ts';
     final rewritten = rewriteHlsPlaylist(
